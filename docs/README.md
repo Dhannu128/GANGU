@@ -1,53 +1,129 @@
-# 🤖 GANGU - Agentic Grocery Assistant
+# 📚 GANGU Documentation Index
 
-Complete agentic AI system for elderly users with LangGraph orchestration.
+**Welcome to GANGU's complete documentation!**
 
-## 🎯 Features
+This is your central hub for all GANGU documentation - from quick start guides to deep architecture docs.
 
-- **7 Intelligent Agents** working in orchestration
-- **Checkpointing** with MongoDB (resume interrupted workflows)
-- **Multi-platform search** (Blinkit, Amazon, Flipkart)
-- **Intelligent comparison** with elderly-focused scoring
-- **LangSmith tracing** for monitoring
-- **Modular architecture** - easy to extend
+---
 
-## 📋 Agent Pipeline
+## 🚀 Getting Started (New Users)
+
+### Essential Starting Points
+- **[../FRONTEND_QUICKSTART.md](../FRONTEND_QUICKSTART.md)** ⭐ START HERE
+  - 5-minute setup guide
+  - One command to install everything
+  - Get GANGU running immediately
+
+- **[../PROJECT_NAVIGATION.md](../PROJECT_NAVIGATION.md)** - Navigation guide
+  - File structure overview
+  - Common tasks
+  - Where to find everything
+
+---
+
+## 💻 Development Documentation
+
+### Frontend Development
+- **[../frontend/README.md](../frontend/README.md)** - Complete frontend guide (400+ lines)
+  - Component documentation
+  - State management
+  - API integration
+  - Troubleshooting
+
+### Backend Development
+- **[../api/README.md](../api/README.md)** - Backend API documentation
+  - API endpoints
+  - WebSocket protocol
+  - Configuration
+  - Testing
+
+### Agent Development
+- **[../ARCHITECTURE.md](../ARCHITECTURE.md)** - Original GANGU architecture
+  - Agent pipeline
+  - LangGraph orchestration
+  - MongoDB checkpointing
+
+---
+
+## 🏗️ Architecture & Design
+
+### System Architecture
+- **[FRONTEND_ARCHITECTURE.md](FRONTEND_ARCHITECTURE.md)** - Complete system design
+  - Frontend ↔ Backend ↔ Agents ↔ MCP flow
+  - API mapping
+  - WebSocket communication
+
+- **[VISUAL_ARCHITECTURE.md](VISUAL_ARCHITECTURE.md)** - ASCII art diagrams
+  - Visual system overview
+  - Data flow diagrams
+  - Component hierarchy
+
+### Design System
+- **[UI_DESIGN_GUIDE.md](UI_DESIGN_GUIDE.md)** - Visual design guide
+  - UI mockups
+  - Color palette
+  - Typography
+  - Animations
+
+---
+
+## 🚢 Deployment & Production
+
+- **[../DEPLOYMENT_GUIDE.md](../DEPLOYMENT_GUIDE.md)** - Complete deployment guide
+  - AWS, Azure, Docker options
+  - SSL/HTTPS setup
+  - Security best practices
+  - Cost estimation
+
+- **[../FRONTEND_CHECKLIST.md](../FRONTEND_CHECKLIST.md)** - Implementation checklist
+  - All features built
+  - Production readiness
+
+---
+
+## 📖 Additional Documentation
+
+### Testing & Data Flow
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Testing instructions
+- **[DATA_FLOW.md](DATA_FLOW.md)** - Data flow documentation
+
+### MCP Integration
+- **[MCP_SETUP_GUIDE.md](MCP_SETUP_GUIDE.md)** - MCP server setup
+- **[PURCHASE_AGENT_ARCHITECTURE.md](PURCHASE_AGENT_ARCHITECTURE.md)** - Purchase agent
+- **[PURCHASE_AGENT_INTEGRATION.md](PURCHASE_AGENT_INTEGRATION.md)** - Integration guide
+
+### Summary
+- **[../IMPLEMENTATION_SUMMARY.md](../IMPLEMENTATION_SUMMARY.md)** - What we built
+
+---
+
+## 🎯 Quick Links by Task
+
+| I want to... | Read this |
+|--------------|-----------|
+| Run GANGU locally | [FRONTEND_QUICKSTART.md](../FRONTEND_QUICKSTART.md) |
+| Understand architecture | [FRONTEND_ARCHITECTURE.md](FRONTEND_ARCHITECTURE.md) |
+| Modify UI | [frontend/README.md](../frontend/README.md) |
+| Add API endpoint | [api/README.md](../api/README.md) |
+| Deploy to production | [DEPLOYMENT_GUIDE.md](../DEPLOYMENT_GUIDE.md) |
+| See visual diagrams | [VISUAL_ARCHITECTURE.md](VISUAL_ARCHITECTURE.md) |
+| Customize design | [UI_DESIGN_GUIDE.md](UI_DESIGN_GUIDE.md) |
+
+---
+
+## 📊 Documentation Overview
 
 ```
-User Input
-   ↓
-1. Input Understanding Agent
-   ↓
-2. Task Planner Agent (BRAIN)
-   ↓
-3. Marketplace Search Agent (Parallel)
-   ↓
-4. Comparison & Ranking Agent
-   ↓
-5. Decision Making Agent
-   ↓
-6. Purchase Execution Agent
-   ↓
-7. Notification Agent
+15+ comprehensive guides
+3,000+ lines of documentation
+50+ code examples
+20+ ASCII art diagrams
+Complete coverage from setup to deployment
 ```
 
-## 🚀 Setup
+---
 
-### 1. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Setup Environment
-```bash
-cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY
-```
-
-### 3. Start MongoDB
-```bash
-docker-compose up -d
-```
+**Need help? Start with [FRONTEND_QUICKSTART.md](../FRONTEND_QUICKSTART.md)!**
 
 ### 4. Run GANGU
 ```bash

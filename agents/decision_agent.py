@@ -978,8 +978,8 @@ def make_decision_with_transparent_failure(comparison_results: Dict[str, Any]) -
             }
         }
     
-    # Check if no products
-    ranked_options = comparison_results.get("ranked_results", [])
+    # Check if no products (try both key names for compatibility)
+    ranked_options = comparison_results.get("ranked_products", comparison_results.get("ranked_results", []))
     if not ranked_options:
         return {
             "status": "failed",
@@ -993,11 +993,12 @@ def make_decision_with_transparent_failure(comparison_results: Dict[str, Any]) -
             }
         }
     
-    # If we reach here with products, something is wrong
-    return report_agent_failure("decision_agent", "Called without valid comparison", True)
+    # Products are available, continue with decision making
+    return {}  # No upstream failure, proceed
 
 def clean_json_response(response_text: str) -> str:
-    """Extract JSON from response, handling markdown code blocks"""
+    """Extract JSON from response, handling markdown code blocks and truncation"""
+    import re
     text = response_text.strip()
     
     # Remove markdown code blocks
@@ -1006,7 +1007,129 @@ def clean_json_response(response_text: str) -> str:
     elif "```" in text:
         text = text.split("```")[1].split("```")[0].strip()
     
+    # Fix common JSON issues
+    # 1. Remove trailing commas before closing braces/brackets
+    text = re.sub(r',(\s*[}\]])', r'\1', text)
+    
+    # 2. If JSON is truncated (no closing brace), try to fix it
+    if text.count('{') > text.count('}'):
+        missing_braces = text.count('{') - text.count('}')
+        if text.rstrip().endswith(',') or not text.rstrip().endswith(('}', ']', '"')):
+            last_complete = max(
+                text.rfind('}'),
+                text.rfind(']'),
+                text.rfind('"')
+            )
+            if last_complete > 0:
+                text = text[:last_complete + 1]
+        text += '}' * missing_braces
+    
+    # 3. Same for arrays
+    if text.count('[') > text.count(']'):
+        missing_brackets = text.count('[') - text.count(']')
+        text += ']' * missing_brackets
+    
     return text
+
+def create_fallback_decision(comparison_results: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Rule-based fallback decision when AI fails
+    Simply picks the top-ranked option
+    Matches the expected output format
+    """
+    ranked_products = comparison_results.get("ranked_products", comparison_results.get("ranked_results", []))
+    
+    if not ranked_products:
+        return {
+            "decision_summary": {
+                "decision_made": False,
+                "decision_type": "no_good_option",
+                "confidence_level": "none",
+                "risk_level": "none"
+            },
+            "selected_option": None,
+            "explanation_for_user": {
+                "simple_message": "Koi product available nahi hai",
+                "why_this_option": "No options found"
+            },
+            "fallback_mode": True
+        }
+    
+    # Pick top-ranked option
+    top_option = ranked_products[0]
+    
+    # Determine decision type based on score/price
+    score = top_option.get("score", 0)
+    price = top_option.get("price", 0)
+    
+    if score >= 80 and price < 500:
+        decision_type = "auto_buy"
+        confidence = "high"
+        risk = "low"
+        decision_made = True
+    elif score >= 60:
+        decision_type = "confirm_with_user"
+        confidence = "medium"
+        risk = "medium"
+        decision_made = True
+    else:
+        decision_type = "confirm_with_user"
+        confidence = "low"
+        risk = "high"
+        decision_made = True
+    
+    platform = top_option.get("platform", "Unknown")
+    item_name = top_option.get("item_name", "Product")
+    
+    # Build fallback options
+    fallback_options = []
+    for product in ranked_products[1:3]:  # Next 2 options
+        fallback_options.append({
+            "platform": product.get("platform"),
+            "product_id": product.get("product_id"),
+            "price": product.get("price"),
+            "delivery_hours": product.get("delivery_time_hours")
+        })
+    
+    return {
+        "decision_summary": {
+            "decision_made": decision_made,
+            "decision_type": decision_type,
+            "confidence_level": confidence,
+            "risk_level": risk
+        },
+        "selected_option": top_option,
+        "final_decision": {
+            "selected_platform": platform,
+            "product": {
+                "name": item_name,
+                "brand": top_option.get("brand", "Unknown"),
+                "product_id": top_option.get("product_id", "unknown"),
+                "quantity": top_option.get("quantity", "1 unit"),
+                "price": price,
+                "currency": "INR"
+            },
+            "delivery": {
+                "eta_hours": top_option.get("delivery_time_hours", 24),
+                "delivery_date": "TBD",
+                "slot": "standard"
+            },
+            "confidence_score": score / 100 if score else 0.8,
+            "fallback_options": fallback_options
+        },
+        "explanation_for_user": {
+            "simple_message": f"{item_name} {platform} se order ho jayega",
+            "why_this_option": f"Best ranked option (Score: {score}/100)",
+            "delivery_info": f"{top_option.get('delivery_time_label', 'Soon')} delivery",
+            "cost": f"₹{price}"
+        },
+        "fallback_mode": True,
+        "metadata": {
+            "timestamp": datetime.now().isoformat(),
+            "note": "Using rule-based fallback decision (AI unavailable)"
+        }
+    }
+
 def make_decision(comparison_results: Dict[str, Any]) -> Dict[str, Any]:
     """REAL AGENTIC SYSTEM - Main decision function with transparent failures"""
     global chat_history
@@ -1037,7 +1160,7 @@ def make_decision(comparison_results: Dict[str, Any]) -> Dict[str, Any]:
                     "temperature": 0.2,
                     "top_p": 0.95,
                     "top_k": 40,
-                    "max_output_tokens": 3072,
+                    "max_output_tokens": 8192,  # Increased to prevent truncation
                     "response_mime_type": "application/json",  # Force JSON
                 }
             )
@@ -1078,20 +1201,10 @@ def make_decision(comparison_results: Dict[str, Any]) -> Dict[str, Any]:
     except json.JSONDecodeError as e:
         print(f"\n❌ DECISION AGENT: JSON parse error - {str(e)}")
         print(f"📄 Response preview: {response_text[:500] if 'response_text' in locals() else 'No response'}...")
-        return {
-            "status": "failed",
-            "error_type": "invalid_json",
-            "agent": "decision_agent",
-            "error_details": str(e),
-            "raw_response": response_text[:800] if 'response_text' in locals() else "No response",
-            "user_message": "❌ Decision Agent: Invalid JSON response",
-            "can_retry": True,
-            "comparison_results_preserved": comparison_results,
-            "metadata": {
-                "timestamp": datetime.now().isoformat(),
-                "failure_reason": "json_parsing_error"
-            }
-        }
+        
+        # Try fallback decision
+        print("🔄 Using fallback decision logic...")
+        return create_fallback_decision(comparison_results)
     
     except Exception as e:
         print(f"\n❌ DECISION AGENT: Unexpected error - {str(e)}")

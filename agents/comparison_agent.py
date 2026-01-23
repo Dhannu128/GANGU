@@ -112,18 +112,25 @@ You MUST recognize these as THE SAME PRODUCT despite:
 
 ### 3️⃣ Data Quality Filtering
 
-**Remove these items from comparison:**
+**⚠️ SPECIAL RULE FOR SINGLE OPTION:**
+If ONLY 1 product found across ALL platforms:
+- ✅ KEEP IT even if it has warnings (low rating, high price, etc.)
+- Only reject if: Out of stock OR Missing price OR Scam indicators
+- Reason: Elderly users need options even if not perfect. Decision Agent will evaluate safety.
+
+**Remove these items from comparison (ONLY if multiple options available):**
 - ❌ Out of stock (`availability: false`)
-- ❌ Quantity mismatch > 2x or < 0.5x requested
-- ❌ Price outliers (>3x median OR <0.3x median)
+- ❌ Quantity mismatch > 3x or < 0.3x requested (very extreme)
+- ❌ Price outliers (>5x median OR <0.2x median) - ONLY for obvious scams
 - ❌ Missing critical fields (no price OR no delivery time)
-- ❌ Delivery time > 7 days (for groceries)
+- ❌ Delivery time > 14 days (for groceries)
 
 **Flag but keep (with warnings):**
 - ⚠️ Low rating (< 3.5 stars)
 - ⚠️ Few reviews (< 50 reviews)
 - ⚠️ High delivery time (> 48 hours)
 - ⚠️ Quantity not exact match
+- ⚠️ Single platform (only found on one platform)
 
 ### 4️⃣ Multi-Criteria Scoring System
 
@@ -732,7 +739,7 @@ chat_history = [
 # ---------------- HELPER FUNCTIONS ---------------- #
 
 def clean_json_response(response_text: str) -> str:
-    """Extract JSON from response, handling markdown code blocks"""
+    """Extract JSON from response, handling markdown code blocks and truncation"""
     text = response_text.strip()
     
     # Remove markdown code blocks
@@ -741,7 +748,150 @@ def clean_json_response(response_text: str) -> str:
     elif "```" in text:
         text = text.split("```")[1].split("```")[0].strip()
     
+    # Fix common JSON issues
+    # 1. Remove trailing commas before closing braces/brackets
+    text = re.sub(r',(\s*[}\]])', r'\1', text)
+    
+    # 2. If JSON is truncated (no closing brace), try to fix it
+    if text.count('{') > text.count('}'):
+        # Count missing closing braces
+        missing_braces = text.count('{') - text.count('}')
+        # Try to find last complete object/array
+        # If truncated mid-string, remove incomplete parts
+        if text.rstrip().endswith(',') or not text.rstrip().endswith(('}', ']', '"')):
+            # Truncated mid-value, go back to last complete entry
+            # Find last complete field or object
+            last_brace = text.rfind('}')
+            last_bracket = text.rfind(']')
+            last_quote_comma = text.rfind('",')  # Complete field
+            
+            last_complete = max(last_brace, last_bracket, last_quote_comma)
+            if last_complete > 0:
+                if text[last_complete] == '"':
+                    text = text[:last_complete + 1]  # Include the quote
+                else:
+                    text = text[:last_complete + 1]
+        # Add missing closing braces
+        text += '}' * missing_braces
+    
+    # 3. Same for arrays
+    if text.count('[') > text.count(']'):
+        missing_brackets = text.count('[') - text.count(']')
+        text += ']' * missing_brackets
+    
     return text
+
+def create_fallback_comparison(search_results: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Rule-based fallback comparison when AI fails
+    Simple sorting by price and delivery time
+    """
+    results = search_results.get("results", [])
+    
+    if not results:
+        return {
+            "comparison_summary": {
+                "total_products_received": 0,
+                "products_after_filtering": 0,
+                "urgency_level": "normal",
+                "fallback_mode": True
+            },
+            "ranked_products": [],
+            "comparison_insights": {
+                "cheapest_option": None,
+                "fastest_delivery": None
+            },
+            "recommendation": {
+                "top_choice": None,
+                "reason": "No products found"
+            }
+        }
+    
+    # Simple rule-based scoring
+    ranked = []
+    for i, product in enumerate(results):
+        # Basic scoring
+        price = product.get("price", 999999)
+        delivery_hours = product.get("delivery_time_hours", 999)
+        rating = product.get("rating", 0)
+        available = product.get("availability", False)
+        
+        # For production: be more lenient with availability checking
+        # Skip only if explicitly marked as unavailable
+        if available is False or (available is None and product.get('stock_status', '').lower() == 'out of stock'):
+            print(f"   ❌ Skipping unavailable product: {product.get('item_name', 'Unknown')}")
+            continue  # Skip out of stock items
+        
+        print(f"   ✅ Processing product: {product.get('item_name', 'Unknown')} (availability: {available})")
+        
+        # For production: use robust scoring system
+        price_score = min(price / 10, 50)  # Cap at 50 points for price
+        delivery_score = min(delivery_hours / 2, 50)  # Delivery time penalty
+        rating_bonus = max(0, (rating - 3) * 10)  # Bonus for good ratings
+        
+        # Final score (0-100, higher is better)
+        final_score = max(10, 100 - price_score - delivery_score + rating_bonus)
+        
+        unit_price, unit_label = calculate_unit_price(price, product.get("quantity", "1 unit"))
+        
+        ranked.append({
+            "rank": i + 1,
+            "platform": product.get("platform", "Unknown"),
+            "item_name": product.get("item_name", "Unknown"),
+            "brand": product.get("brand", "Unknown"),
+            "price": float(price),
+            "unit_price": unit_price,
+            "unit_price_label": unit_label,
+            "quantity": product.get("quantity", "1 unit"),
+            "delivery_time_hours": int(delivery_hours),
+            "delivery_time_label": f"{int(delivery_hours)}h" if delivery_hours < 24 else f"{int(delivery_hours//24)}d",
+            "rating": rating if rating > 0 else 3.5,  # Default rating if missing
+            "availability": available,
+            "score": round(final_score, 2),
+            "product_id": product.get("product_id", "unknown")
+        })
+    
+    # Sort by score (higher is better now)
+    ranked.sort(key=lambda x: x["score"], reverse=True)
+    
+    # Update ranks
+    for i, item in enumerate(ranked):
+        item["rank"] = i + 1
+    
+    # Add special note for single-option case
+    single_option_note = ""
+    if len(ranked) == 1:
+        single_option_note = " (Only one option found - still presented for user decision)"
+    
+    # Find cheapest and fastest
+    cheapest = min(ranked, key=lambda x: x["price"]) if ranked else None
+    fastest = min(ranked, key=lambda x: x["delivery_time_hours"]) if ranked else None
+    
+    return {
+        "comparison_summary": {
+            "total_products_received": len(results),
+            "products_after_filtering": len(ranked),
+            "urgency_level": "normal",
+            "fallback_mode": True,
+            "note": f"Using rule-based comparison (AI unavailable){single_option_note}"
+        },
+        "ranked_products": ranked,
+        "comparison_insights": {
+            "cheapest_option": {
+                "platform": cheapest["platform"] if cheapest else None,
+                "price": cheapest["price"] if cheapest else None
+            },
+            "fastest_delivery": {
+                "platform": fastest["platform"] if fastest else None,
+                "hours": fastest["delivery_time_hours"] if fastest else None
+            },
+            "single_option": len(ranked) == 1
+        },
+        "recommendation": {
+            "top_choice": ranked[0] if ranked else None,
+            "reason": "Best overall balance of price and delivery"
+        }
+    }
 
 def calculate_unit_price(price: float, quantity_str: str) -> Tuple[float, str]:
     """
@@ -819,10 +969,10 @@ def compare_products(search_results: Dict[str, Any]) -> Dict[str, Any]:
                 model=MODEL_NAME,
                 contents=chat_history,
                 config={
-                    "temperature": 0.3,
+                    "temperature": 0.2,  # Lower temperature for more consistent JSON
                     "top_p": 0.95,
                     "top_k": 40,
-                    "max_output_tokens": 4096,
+                    "max_output_tokens": 8192,  # Increased to prevent truncation
                     "response_mime_type": "application/json",  # Force JSON
                 }
             )
@@ -836,26 +986,39 @@ def compare_products(search_results: Dict[str, Any]) -> Dict[str, Any]:
             cleaned_response = clean_json_response(response_text)
             parsed_output = json.loads(cleaned_response)
             
+            # DEBUG: Print what we got
+            ranked_count = len(parsed_output.get('ranked_products', []))
+            print(f"🔍 DEBUG: Comparison returned {ranked_count} ranked products")
+            if parsed_output.get('ranked_products'):
+                print(f"🔍 DEBUG: First product: {parsed_output['ranked_products'][0].get('platform', 'Unknown')}")
+            
+            # CRITICAL FIX: If AI returned 0 products but we have search results, use fallback
+            if ranked_count == 0 and search_results.get('results') and len(search_results.get('results', [])) > 0:
+                print(f"⚠️ AI returned 0 products but we have {len(search_results['results'])} search results. Using fallback.")
+                fallback_result = create_fallback_comparison(search_results)
+                print(f"🔍 DEBUG: Fallback returned {len(fallback_result.get('ranked_products', []))} ranked products")
+                return fallback_result
+            
             # SUCCESS
             return parsed_output
             
         except json.JSONDecodeError as e:
             print(f"❌ COMPARISON AGENT: JSON parse error - {str(e)}")
             print(f"📄 Response preview: {response_text[:500] if 'response_text' in locals() else 'No response'}...")
-            return {
-                "status": "failed",
-                "error_type": "invalid_json",
-                "agent": "comparison_agent",
-                "error_details": str(e),
-                "raw_response": response_text[:800] if 'response_text' in locals() else "No response",
-                "user_message": "❌ Comparison Agent: Invalid JSON response from model",
-                "can_retry": True,
-                "search_results_preserved": search_results,
-                "metadata": {
-                    "timestamp": datetime.now().isoformat(),
-                    "failure_reason": "json_parsing_error"
-                }
-            }
+            
+            # Retry on JSON errors (could be temporary API issue)
+            if attempt < max_retries - 1:
+                print(f"🔄 Retrying... (attempt {attempt+2}/{max_retries})")
+                import time
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            
+            # Final attempt failed - return error
+            print(f"❌ All retry attempts exhausted. Using fallback comparison.")
+            fallback_result = create_fallback_comparison(search_results)
+            print(f"🔍 DEBUG: Fallback returned {len(fallback_result.get('ranked_products', []))} ranked products")
+            return fallback_result
         
         except Exception as e:
             error_str = str(e)

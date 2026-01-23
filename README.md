@@ -2,18 +2,52 @@
 
 **GANGU** (Grocery Assistant for eNderly users Going Universal) is an intelligent agentic AI system designed to help elderly Indian users order groceries through natural language conversations in Hindi, English, or Hinglish.
 
+## ✨ NEW: Voice-First Frontend!
+
+**GANGU now has a beautiful, voice-first web interface!**
+
+🎙️ **Tap the mic button and speak naturally**  
+🤖 **Watch GANGU think in real-time**  
+🛒 **See smart product comparisons**  
+✅ **Confirm before purchase**
+
+**Quick Start:**
+```powershell
+.\scripts\setup_frontend.ps1      # One-time setup
+.\scripts\start_dev_servers.ps1   # Start both servers
+# Open http://localhost:3000
+```
+
+[📚 Frontend Quick Start Guide →](FRONTEND_QUICKSTART.md)
+
+---
+
 ## 📂 Project Structure
 
 ```
 GANGU/
+├── frontend/                        # 🎨 NEW: Next.js Frontend
+│   ├── app/                         # Main pages
+│   ├── components/                  # UI components
+│   │   ├── VoiceInput.tsx          # 🎙️ Voice input
+│   │   ├── AgentTimeline.tsx       # 🤖 Live agent status
+│   │   ├── ProductComparison.tsx   # 🛒 Product cards
+│   │   ├── OrderConfirmation.tsx   # ✅ Confirmation modal
+│   │   └── SuccessScreen.tsx       # 🎉 Order success
+│   ├── lib/                        # State & API client
+│   └── README.md                   # Frontend documentation
+│
+├── api/                             # 🔌 NEW: FastAPI Backend
+│   ├── main.py                      # REST API + WebSocket server
+│   └── requirements.txt             # Backend dependencies
+│
 ├── agents/                          # Core AI Agents
-│   ├── intent_extraction_agent.py   # ✅ Agent 1: Extract intent from user input
-│   ├── task_planner_agent.py        # ✅ Agent 2: Create execution plan
-│   ├── search_agent.py              # ✅ Agent 3: Search across platforms (MCP)
-│   ├── comparison_agent.py          # 🔨 TODO: Compare & rank results
-│   ├── decision_agent.py            # 🔨 TODO: Select best option
-│   ├── purchase_agent.py            # 🔨 TODO: Execute order
-│   └── notification_agent.py        # 🔨 TODO: Send response
+│   ├── intent_extraction_agent.py   # ✅ Agent 1: Extract intent
+│   ├── task_planner_agent.py        # ✅ Agent 2: Create plan
+│   ├── search_agent.py              # ✅ Agent 3: Search platforms (MCP)
+│   ├── comparison_agent.py          # ✅ Agent 4: Compare & rank
+│   ├── decision_agent.py            # ✅ Agent 5: Select best option
+│   └── purchase_agent.py            # ✅ Agent 6: Execute order
 │
 ├── mcp_clients/                     # MCP Server Clients
 │   ├── zepto_mcp_client.py          # ✅ Zepto platform integration
@@ -21,17 +55,22 @@ GANGU/
 │
 ├── orchestration/                   # LangGraph Workflow
 │   ├── gangu_graph.py               # ✅ Main agent orchestration
-│   ├── gangu_main.py                # ✅ Interactive interface
+│   ├── gangu_main.py                # ✅ CLI interface
 │   └── gangu_support.py             # ✅ Admin/support interface
+│
+├── scripts/                         # 🚀 NEW: Setup Scripts
+│   ├── setup_frontend.ps1           # One-time setup
+│   └── start_dev_servers.ps1        # Start both servers
 │
 ├── config/                          # Configuration
 │   ├── docker-compose.yml           # MongoDB for checkpointing
 │   └── requirements.txt             # Python dependencies
 │
 └── docs/                            # Documentation
-    ├── MCP_SETUP_GUIDE.md           # Amazon & Zepto MCP setup
+    ├── FRONTEND_ARCHITECTURE.md     # 🎨 NEW: Frontend design
+    ├── UI_DESIGN_GUIDE.md           # 🎨 NEW: Visual guide
+    ├── MCP_SETUP_GUIDE.md           # MCP setup instructions
     ├── DATA_FLOW.md                 # Data flow documentation
-    ├── README.md                    # Documentation index
     └── TESTING_GUIDE.md             # Testing instructions
 ```
 
@@ -178,19 +217,24 @@ python orchestration/gangu_main.py
 ## 🔌 MCP Integration
 
 **Currently Integrated:**
-- ✅ Zepto (10-15 min delivery, 100+ products)
+- ✅ **Zepto** (India - 10-15 min delivery, 100+ products)
+- ✅ **Amazon** (India - E-commerce via Fewsats MCP)
+- ✅ **Walmart** (USA - Retail & grocery via Apify MCP) 🆕
+
+**All platforms search in parallel for maximum speed!**
 
 **Coming Soon:**
 - 🔨 Blinkit
 - 🔨 Swiggy Instamart
-- 🔨 Amazon Fresh
+
+[📖 Walmart Setup Guide](WALMART_SETUP_GUIDE.md)
 
 ## 📊 Status
 
 ### ✅ Completed
 - Intent extraction (Hindi/English/Hinglish)
 - Task planning
-- Multi-platform search with Zepto MCP
+- Multi-platform search with MCP (Zepto + Amazon + Walmart)
 - LangGraph orchestration
 - MongoDB checkpointing
 

@@ -89,7 +89,8 @@ def check_agents():
         "agents.task_planner_agent",
         "agents.search_agent",
         "agents.comparison_agent",
-        "agents.decision_agent"
+        "agents.decision_agent",
+        "agents.purchase_agent"
     ]
     
     all_ok = True
