@@ -1,0 +1,122 @@
+[
+  {
+    "id": "gangu_001",
+    "topic": "what_is_gangu",
+    "question": "GANGU kya hai? What is GANGU?",
+    "answer": "GANGU ek AI-powered grocery assistant hai jo elderly Indian users ke liye banaya gaya hai. Yeh Hindi, Hinglish aur English samajhta hai. Aap bas bol dijiye kya chahiye aur GANGU sabse accha deal dhoondh kar order kar dega.",
+    "answer_en": "GANGU is an AI-powered grocery assistant designed for elderly Indian users. It understands Hindi, Hinglish, and English. Just tell it what you need and GANGU will find the best deal and place the order for you.",
+    "tags": ["gangu", "introduction", "kya hai", "what is"]
+  },
+  {
+    "id": "gangu_002",
+    "topic": "how_to_order",
+    "question": "Order kaise karte hain? How to place an order?",
+    "answer": "Aap GANGU ko seedha bol sakte hain jaise: 'Gangu, doodh le aao' ya 'White chane khatam ho gaye'. GANGU samajh jayega ki aapko kya chahiye, sabse accha platform dhundega, price compare karega aur aapko confirm karne ke baad order kar dega.",
+    "answer_en": "You can simply tell GANGU what you need, like: 'Gangu, get milk' or 'White chickpeas are finished'. GANGU will understand your need, search the best platforms, compare prices, and place the order after your confirmation.",
+    "tags": ["order", "how to", "kaise", "purchase"]
+  },
+  {
+    "id": "gangu_003",
+    "topic": "supported_platforms",
+    "question": "GANGU kaun kaun se platforms par kaam karta hai? Which platforms does GANGU support?",
+    "answer": "GANGU abhi Zepto (live integration), Amazon (Apify-based search), Blinkit aur BigBasket (coming soon) par kaam karta hai. Zepto par real-time ordering Cash on Delivery ke saath available hai.",
+    "answer_en": "GANGU currently works with Zepto (live integration), Amazon (Apify-based search), Blinkit and BigBasket (coming soon). Real-time ordering with Cash on Delivery is available on Zepto.",
+    "tags": ["platforms", "zepto", "amazon", "blinkit", "bigbasket"]
+  },
+  {
+    "id": "gangu_004",
+    "topic": "payment_methods",
+    "question": "Payment kaise hoga? What payment methods are supported?",
+    "answer": "Abhi GANGU Zepto par Cash on Delivery (COD) support karta hai. Aapko online payment ki zarurat nahi hai - delivery boy ko paisa de dijiye. UPI aur card payment jaldi aa raha hai.",
+    "answer_en": "Currently GANGU supports Cash on Delivery (COD) on Zepto. No online payment needed - just pay the delivery person. UPI and card payment support is coming soon.",
+    "tags": ["payment", "cod", "cash on delivery", "upi", "paisa"]
+  },
+  {
+    "id": "gangu_005",
+    "topic": "voice_input",
+    "question": "Bol kar order de sakte hain? Can I use voice?",
+    "answer": "Haan! GANGU voice input support karta hai. Chrome ya Edge browser par voice button dabayein aur Hindi ya English mein bol dijiye. GANGU aapki baat samajh jayega.",
+    "answer_en": "Yes! GANGU supports voice input. Press the voice button on Chrome or Edge browser and speak in Hindi or English. GANGU will understand your request.",
+    "tags": ["voice", "speech", "bol", "awaaz", "microphone"]
+  },
+  {
+    "id": "gangu_006",
+    "topic": "delivery_time",
+    "question": "Delivery kitne time mein hogi? How long does delivery take?",
+    "answer": "Delivery time platform par depend karta hai: Zepto 10-30 minutes, Blinkit 10-20 minutes, BigBasket next day, Amazon 1-2 days. GANGU aapko sabki delivery time compare karke batata hai.",
+    "answer_en": "Delivery time depends on the platform: Zepto 10-30 min, Blinkit 10-20 min, BigBasket next day, Amazon 1-2 days. GANGU compares delivery times across all platforms for you.",
+    "tags": ["delivery", "time", "kitna time", "kab aayega"]
+  },
+  {
+    "id": "gangu_007",
+    "topic": "price_comparison",
+    "question": "Price compare kaise hota hai? How does price comparison work?",
+    "answer": "GANGU ek saath multiple platforms (Zepto, Amazon, etc.) par item search karta hai. Phir unit price calculate karta hai (₹/kg ya ₹/piece), delivery time, rating sab compare karke score deta hai - 100 mein se. Sabse accha option aapko recommend karta hai.",
+    "answer_en": "GANGU searches multiple platforms (Zepto, Amazon, etc.) simultaneously. It calculates unit price (₹/kg or ₹/piece), compares delivery time, ratings, and gives a score out of 100. The best option is recommended to you.",
+    "tags": ["price", "compare", "comparison", "sasta", "mehenga", "rate"]
+  },
+  {
+    "id": "gangu_008",
+    "topic": "cancel_order",
+    "question": "Order cancel kaise karein? How to cancel an order?",
+    "answer": "GANGU mein order confirm hone se pehle cancel kar sakte hain. Pipeline chalte waqt cancel button dabayein. Agar order already place ho gaya hai toh concerned platform (Zepto/Amazon) par jaake cancel karein.",
+    "answer_en": "You can cancel before the order is confirmed in GANGU. Press the cancel button while the pipeline is running. If the order is already placed, you need to cancel it on the respective platform (Zepto/Amazon).",
+    "tags": ["cancel", "band karo", "nahi chahiye", "ruko"]
+  },
+  {
+    "id": "gangu_009",
+    "topic": "language_support",
+    "question": "Kaunsi language support karta hai? What languages are supported?",
+    "answer": "GANGU teen languages samajhta hai: Hindi (\"doodh le aao\"), English (\"get me milk\"), aur Hinglish (\"milk ka 1 packet chahiye\"). Aap kisi bhi tareeke se bol sakte hain, GANGU samajh jayega.",
+    "answer_en": "GANGU understands three languages: Hindi, English, and Hinglish (mix of both). You can speak in any style and GANGU will understand your intent.",
+    "tags": ["language", "hindi", "english", "hinglish", "bhasha"]
+  },
+  {
+    "id": "gangu_010",
+    "topic": "elderly_friendly",
+    "question": "Buzurg logon ke liye kaise helpful hai? How is it helpful for elderly?",
+    "answer": "GANGU specially elderly users ke liye bana hai: 1) Seedha bol kar order dein - typing ki zarurat nahi, 2) Hindi mein response milta hai, 3) Best deal automatic dhundh leta hai, 4) COD payment - online payment ki zarurat nahi, 5) Simple aur saral interface.",
+    "answer_en": "GANGU is specially designed for elderly users: 1) Voice ordering - no typing needed, 2) Responses in Hindi, 3) Automatically finds best deals, 4) COD payment - no online payment, 5) Simple and easy interface.",
+    "tags": ["elderly", "buzurg", "bade", "senior", "easy", "simple"]
+  },
+  {
+    "id": "gangu_011",
+    "topic": "agent_pipeline",
+    "question": "GANGU pipeline kaise kaam karta hai? How does the agent pipeline work?",
+    "answer": "GANGU 7-step pipeline use karta hai: 1) Intent Agent - aapki baat samajhta hai, 2) Task Planner - plan banata hai, 3) Search Agent - platforms par dhundta hai, 4) Comparison Agent - compare karta hai, 5) Decision Agent - best choose karta hai, 6) Purchase Agent - order karta hai, 7) Notification Agent - aapko batata hai. Yeh sab automatic hota hai!",
+    "answer_en": "GANGU uses a 7-step pipeline: 1) Intent Agent - understands your request, 2) Task Planner - creates plan, 3) Search Agent - searches platforms, 4) Comparison Agent - compares options, 5) Decision Agent - selects best, 6) Purchase Agent - places order, 7) Notification Agent - informs you.",
+    "tags": ["pipeline", "agent", "kaise kaam", "how works", "architecture"]
+  },
+  {
+    "id": "gangu_012",
+    "topic": "urgency_handling",
+    "question": "Urgent order kaise dein? How to place urgent orders?",
+    "answer": "Apni baat mein urgency dikhayein: 'Gangu, doodh ABHI chahiye' ya 'jaldi se atta mangao'. GANGU urgency detect karega aur sabse tez delivery wala platform choose karega. Urgent orders mein auto-buy bhi ho sakta hai.",
+    "answer_en": "Show urgency in your request: 'Gangu, need milk NOW' or 'get atta quickly'. GANGU will detect urgency and choose the fastest delivery platform. Urgent orders may trigger auto-buy.",
+    "tags": ["urgent", "jaldi", "abhi", "turant", "emergency", "fast"]
+  },
+  {
+    "id": "gangu_013",
+    "topic": "product_not_found",
+    "question": "Product nahi mila toh kya hoga? What if a product is not found?",
+    "answer": "Agar kisi platform par product available nahi hai toh GANGU dusre platforms par dhundta hai. Agar kahin nahi mila toh GANGU aapko bata dega aur alternative suggest karega.",
+    "answer_en": "If a product is not available on one platform, GANGU searches others. If not found anywhere, GANGU will inform you and suggest alternatives.",
+    "tags": ["not found", "nahi mila", "unavailable", "out of stock"]
+  },
+  {
+    "id": "gangu_014",
+    "topic": "data_privacy",
+    "question": "Mera data safe hai? Is my data safe?",
+    "answer": "GANGU aapka data locally store karta hai aur sirf order karne ke liye platform APIs use karta hai. Aapke personal details (phone, address) sirf order ke liye platform ko jate hain. Hum koi third party ko data share nahi karte.",
+    "answer_en": "GANGU stores your data locally and only uses platform APIs for ordering. Your personal details (phone, address) are shared only with the ordering platform. We do not share data with any third party.",
+    "tags": ["privacy", "data", "safe", "secure", "personal"]
+  },
+  {
+    "id": "gangu_015",
+    "topic": "multiple_items",
+    "question": "Ek saath multiple items order kar sakte hain? Can I order multiple items at once?",
+    "answer": "Haan! Aap bol sakte hain 'Slice aur lays mangao' ya 'doodh, bread aur anda chahiye'. GANGU sab items detect karega aur unhe individually search aur order karega.",
+    "answer_en": "Yes! You can say 'Order Slice and Lays' or 'I need milk, bread and eggs'. GANGU will detect all items and search/order them individually.",
+    "tags": ["multiple", "ek saath", "many items", "list"]
+  }
+]

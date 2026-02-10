@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GANGU – Voice & Chat Grocery Assistant</title>
+  <meta name="description" content="GANGU – Voice-first AI grocery ordering with agent workflow visibility." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind (CDN) for fast, professional UI without a Node build step -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: "#eef2ff",
+              100: "#e0e7ff",
+              500: "#6366f1",
+              600: "#4f46e5",
+              700: "#4338ca"
+            }
+          },
+          fontFamily: {
+            sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Arial", "Noto Sans", "sans-serif"],
+          },
+        }
+      }
+    };
+  </script>
+
+  <!-- Markdown rendering (sanitized) for nicer assistant responses -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <link rel="stylesheet" href="/app/styles.css?v=20260209" />
+</head>
+
+<body class="bg-slate-950 text-slate-100 font-sans">
+  <div class="bg-aurora" aria-hidden="true"></div>
+  <div class="min-h-screen">
+    <!-- Header -->
+    <header class="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/65 backdrop-blur">
+      <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div
+            class="h-10 w-10 rounded-2xl bg-gradient-to-br from-brand-600 via-fuchsia-500 to-cyan-400 grid place-items-center shadow-lg shadow-black/30 ring-1 ring-white/10">
+            <span class="font-extrabold tracking-tight">G</span>
+          </div>
+          <div>
+            <div class="font-semibold leading-tight flex items-center gap-2">
+              <span>GANGU</span>
+              <span class="pill">Voice-first</span>
+              <span class="pill">Agentic</span>
+            </div>
+            <div class="text-xs text-slate-400">Order groceries by chat or voice • Watch the pipeline work in real time
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span id="connBadge" class="badge badge-warn">Disconnected</span>
+          <button id="btnSpeak" class="btn btn-ghost" title="Toggle text-to-speech for assistant">TTS</button>
+          <button id="btnTheme" class="btn btn-ghost" title="Toggle compact mode">Compact</button>
+          <button id="btnClear" class="btn btn-ghost" title="Clear chat">Clear</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Sidebar: agent workflow -->
+      <aside class="lg:col-span-4 xl:col-span-3">
+        <div class="panel">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="panel-title">Agent Workflow</div>
+              <div class="text-xs text-slate-400">Click a step to inspect outputs.</div>
+            </div>
+            <button id="btnToggleDebug" class="btn btn-ghost btn-sm" title="Show/hide debug feed">Debug</button>
+          </div>
+
+          <ol id="workflow" class="space-y-2 mt-3"></ol>
+
+          <div class="mt-4 border-t border-slate-800/80 pt-4">
+            <div class="panel-title">Inspector</div>
+            <div class="text-xs text-slate-400">Latest details for the selected step.</div>
+            <div class="inspector mt-3">
+              <div class="flex items-center justify-between">
+                <div id="inspectorStep" class="text-sm font-semibold">(select a step)</div>
+                <span id="inspectorStatus" class="badge badge-warn">—</span>
+              </div>
+              <div id="inspectorMsg" class="text-xs text-slate-300 mt-2"></div>
+              <pre id="inspectorData" class="inspector-pre mt-3"></pre>
+            </div>
+          </div>
+
+          <div class="mt-4 border-t border-slate-800 pt-4">
+            <div class="text-xs text-slate-400">Session</div>
+            <div class="flex items-center justify-between gap-2">
+              <div id="sessionId" class="font-mono text-xs text-slate-200 break-all"></div>
+              <button id="btnNewSession" class="btn btn-ghost btn-sm">New</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="debugPanel" class="panel mt-6" hidden>
+          <div class="panel-title">Debug feed</div>
+          <div class="text-xs text-slate-400 mb-3">Raw WebSocket events (for dev).</div>
+          <div id="debugFeed" class="debug-feed"></div>
+        </div>
+      </aside>
+
+      <!-- Chat area -->
+      <section class="lg:col-span-8 xl:col-span-9">
+        <div class="panel">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="panel-title">Chat</div>
+              <div class="text-xs text-slate-400">Speak or type. You’ll see each agent step complete as the pipeline
+                runs.</div>
+            </div>
+            <div class="hidden md:flex items-center gap-2">
+              <button id="btnCancel" class="btn btn-ghost">Cancel</button>
+            </div>
+          </div>
+
+          <div id="chat" class="chat-box mt-4"></div>
+
+          <div id="typing" class="typing" hidden>
+            <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+            <span class="text-xs text-slate-400 ml-2">GANGU is thinking…</span>
+          </div>
+
+          <div class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-2">
+            <div class="md:col-span-9">
+              <input id="message" class="input" placeholder="Try: 'Cadbury Dairy Milk 2 le aao, urgent'"
+                autocomplete="off" />
+            </div>
+            <div class="md:col-span-3 flex gap-2">
+              <button id="btnMic" class="btn btn-secondary w-full" title="Voice input">Mic</button>
+              <button id="btnSend" class="btn btn-primary w-full">Send</button>
+            </div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap gap-2" id="chips" aria-label="Quick suggestions"></div>
+
+          <div class="mt-4" id="recommendations" hidden>
+            <div class="panel-title">Recommendations</div>
+            <div class="text-xs text-slate-400 mb-3">Choose an option to confirm purchase.</div>
+            <div id="products" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+          </div>
+        </div>
+
+        <div class="text-xs text-slate-500 mt-4">
+          Tip: Click the Mic button to record your voice. Audio is transcribed using OpenAI Whisper for accurate Hindi/English support.
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app/app.js?v=20260209"></script>
+</body>
+
+</html>
