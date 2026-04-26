@@ -101,6 +101,14 @@ def init():
                 # Use invoke for simpler execution
                 result = gangu_graph.invoke(initial_state)
                 
+                # Check if confirmation is needed
+                decision_type = result.get("decision_type", "")
+                purchase_status = result.get("purchase_status", "")
+                
+                if decision_type == "confirm_with_user" and purchase_status == "pending_confirmation":
+                    # Handle confirmation flow
+                    result = handle_user_confirmation(gangu_graph, result)
+                
                 # Display response
                 response = result.get("ai_response", "⚠️ Processing incomplete. Please try again.")
                 
@@ -122,6 +130,170 @@ def init():
         except Exception as e:
             print(f"\n❌ Unexpected error: {e}")
             print("   Please try again.")
+
+
+def handle_user_confirmation(gangu_graph, result):
+    """Handle user confirmation for order placement"""
+    selected_option = result.get("selected_option", {})
+    platform = selected_option.get("platform", "Unknown")
+    item_name = result.get("item_name", "Item")
+    price = selected_option.get("normalized_attributes", {}).get("unit_price_label", "Price not available")
+    delivery = selected_option.get("normalized_attributes", {}).get("delivery_time_label", "Delivery time not available")
+    
+    # Display confirmation prompt in Hindi/English mix (as user prefers)
+    print("\n" + "=" * 70)
+    print("🤖 GANGU Order Confirmation:")
+    print("=" * 70)
+    
+    # Display recommendation summary
+    print(f"📦 Recommended Option:")
+    print(f"   Platform: {platform}")
+    print(f"   Product: {item_name}")
+    print(f"   Price: {price}")
+    print(f"   Delivery: {delivery}")
+    print()
+    
+    # Risk information for Zepto
+    if platform.lower() == "zepto":
+        print("⚠️  Note: Zepto orders might face stock availability issues.")
+        print("   However, it's the cheapest and fastest option.")
+        print()
+    
+    # Ask for confirmation
+    print("**Kya main yeh order place kar doon?**")
+    print()
+    print("Options:")
+    print("  📋 **Yes** - Order place karo (proceed with purchase)")
+    print("  ❌ **No**  - Order cancel karo (cancel purchase)")
+    print()
+    
+    while True:
+        try:
+            user_choice = input("👤 Your Choice (Yes/No): ").strip().lower()
+            
+            if user_choice in ['yes', 'y', 'haan', 'ha', 'kar do', 'place karo']:
+                print("\n✅ Order confirmation received! Processing purchase...")
+                print("\n" + "=" * 70)
+                print("💳 Processing Order...")
+                print("=" * 70)
+                
+                # Update state to proceed with purchase
+                result["decision_type"] = "auto_buy"
+                result["purchase_status"] = "processing"
+                result["user_confirmed"] = True
+                
+                # Create new state for purchase execution
+                purchase_state = {
+                    "user_input": result.get("user_input", ""),
+                    "selected_option": selected_option,
+                    "decision_type": "auto_buy",
+                    "item_name": item_name,
+                    "quantity": result.get("quantity", "1"),
+                    "purchase_status": "processing",
+                    "user_confirmed": True
+                }
+                
+                # Execute purchase using the actual purchase agent
+                try:
+                    from agents.purchase_agent import execute_purchase
+                    
+                    # Prepare proper input for purchase agent as per its expected format
+                    purchase_input = {
+                        "final_decision": {
+                            "selected_platform": selected_option.get("platform", "zepto"),
+                            "product": {
+                                "name": item_name,
+                                "price": selected_option.get("normalized_attributes", {}).get("price", 30),
+                                "quantity": result.get("quantity", "1kg"),
+                                "product_id": item_name.lower().replace(" ", "_").replace("-", "_")
+                            },
+                            "delivery": {
+                                "delivery_date": "today",
+                                "slot": "within 1 hour"
+                            }
+                        },
+                        "user_context": {
+                            "payment_preference": "cash_on_delivery",
+                            "platform_preference": "zepto",
+                            "confirmed_by_user": True
+                        }
+                    }
+                    
+                    print("   🚀 Executing Zepto Cash on Delivery order...")
+                    purchase_result = execute_purchase(purchase_input)
+                    
+                    # Process the purchase result
+                    if purchase_result.get("purchase_status") == "success":
+                        order_id = purchase_result.get("execution_details", {}).get("order_id", "Unknown")
+                        platform_used = purchase_result.get("execution_details", {}).get("platform_used", "Zepto")
+                        product_name = purchase_result.get("order_confirmation", {}).get("product_name", item_name)
+                        final_price = purchase_result.get("order_confirmation", {}).get("final_price", "N/A")
+                        
+                        result["purchase_status"] = "success"
+                        result["order_id"] = order_id
+                        result["ai_response"] = f"""✅ Order Successfully Placed!
+
+📦 Order Details:
+   Platform: {platform_used}
+   Product: {product_name}
+   Price: ₹{final_price}
+   Payment: Cash on Delivery (COD)
+   Order ID: {order_id}
+   Delivery: Within 1 hour
+
+🎉 Aapka order place ho gaya! Delivery person aayega aur aap cash mein payment kar denge.
+
+Thank you for using GANGU! 🙏"""
+                        
+                    elif purchase_result.get("purchase_status") == "failed":
+                        result["purchase_status"] = "failed"
+                        error_msg = purchase_result.get("user_message", "Order placement failed")
+                        result["ai_response"] = f"""❌ Order Failed
+
+{error_msg}
+
+😔 Kshama karein, order place nahi ho paaya. Kya aap dusra option try karna chahenge ya phir se koshish karein?"""
+                    else:
+                        result["purchase_status"] = "pending"
+                        result["ai_response"] = f"""⏳ Order Processing...
+
+Aapka order process ho raha hai. Thoda intezaar kariye...
+
+Status: {purchase_result.get('purchase_status', 'unknown')}"""
+                    
+                except Exception as e:
+                    print(f"❌ Purchase execution failed: {e}")
+                    result["ai_response"] = f"❌ माफ़ करें, ऑर्डर प्लेस करते समय समस्या आई। कृपया बाद में कोशिश करें।\nError: {str(e)}"
+                    result["purchase_status"] = "failed"
+                
+                break
+                
+            elif user_choice in ['no', 'n', 'nahi', 'cancel', 'cancel karo', 'mat karo']:
+                print("\n❌ Order cancelled by user.")
+                result["decision_type"] = "cancelled_by_user"
+                result["purchase_status"] = "cancelled"
+                result["user_confirmed"] = False
+                result["ai_response"] = f"❌ ऑर्डर cancel कर दिया गया।\n\n📋 Summary:\n   Item: {item_name}\n   Platform: {platform}\n   Status: Cancelled by user\n\nकोई और चीज़ चाहिए तो बताइए! 😊"
+                break
+                
+            else:
+                print(f"⚠️  Please answer with 'Yes' or 'No' (you entered: '{user_choice}')")
+                print("   Valid responses: Yes, Y, No, N, Haan, Nahi")
+                continue
+                
+        except KeyboardInterrupt:
+            print("\n\n❌ Order cancelled by user (Ctrl+C)")
+            result["decision_type"] = "cancelled_by_user"
+            result["purchase_status"] = "cancelled"
+            result["user_confirmed"] = False
+            result["ai_response"] = "❌ ऑर्डर cancel कर दिया गया। कोई और चीज़ चाहिए तो बताइए!"
+            break
+            
+        except Exception as e:
+            print(f"❌ Error during confirmation: {e}")
+            continue
+    
+    return result
 
 
 if __name__ == "__main__":

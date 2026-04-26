@@ -56,19 +56,7 @@ except ImportError as e:
     AMAZON_MCP_AVAILABLE = False
     print(f"⚠️ Amazon MCP client not available: {e}")
 
-# Try to import Walmart MCP client
-WALMART_MCP_ENABLED = os.environ.get('WALMART_MCP_ENABLED', 'false').lower() == 'true'
-try:
-    if WALMART_MCP_ENABLED:
-        from mcp_clients.walmart_mcp_client import WalmartMCPClient
-        WALMART_MCP_AVAILABLE = True
-        print("✅ Walmart MCP client loaded successfully")
-    else:
-        WALMART_MCP_AVAILABLE = False
-        print("ℹ️ Walmart MCP is disabled (set WALMART_MCP_ENABLED=true to enable)")
-except ImportError as e:
-    WALMART_MCP_AVAILABLE = False
-    print(f"⚠️ Walmart MCP client not available: {e}")
+
 
 # ---------------- API CONFIGURATION ---------------- #
 
@@ -1019,89 +1007,6 @@ async def search_zepto_mcp(item_name: str) -> dict:
             pass  # Ignore cleanup errors
 
 
-async def search_walmart_mcp(item_name: str) -> dict:
-    """
-    Search Walmart using Apify Walmart Savings MCP - REAL DATA!
-    Returns real product data from Walmart
-    """
-    if not WALMART_MCP_AVAILABLE:
-        return {"found": False, "error": "Walmart MCP not available"}
-    
-    # Check if APIFY_TOKEN is set
-    if not os.environ.get('APIFY_TOKEN'):
-        print("⚠️ APIFY_TOKEN not set, skipping Walmart search")
-        return {
-            "platform": "Walmart",
-            "found": False,
-            "message": "APIFY_TOKEN not configured",
-            "source": "walmart_mcp"
-        }
-    
-    client = None
-    try:
-        client = WalmartMCPClient()
-        await client.connect()
-        result = await client.search_product(item_name, max_results=3)
-        
-        # Transform MCP result to GANGU format
-        if result.get("found") and result.get("products"):
-            product = result["products"][0]  # Take first product
-            
-            # Parse price (remove $ and convert to float)
-            price_str = product.get("price", "0")
-            try:
-                if price_str.startswith("$"):
-                    price = float(price_str[1:])
-                else:
-                    price = float(price_str) if price_str != "Check on Walmart" else 0.0
-            except:
-                price = 0.0
-            
-            return {
-                "platform": "Walmart",
-                "found": True,
-                "item_name": product.get("product_name"),
-                "price": price,
-                "quantity": "1 unit",
-                "availability": product.get("availability") != "Out of Stock",
-                "stock_status": product.get("availability", "In Stock"),
-                "delivery_time": "2-3 days",  # Standard Walmart delivery
-                "delivery_time_hours": normalize_delivery_time("2-3 days"),
-                "url": product.get("url"),
-                "rating": product.get("rating", "N/A"),
-                "reviews_count": 0,
-                "product_id": product.get("id", "walmart_unknown"),
-                "elderly_friendly": True,
-                "source": "walmart_mcp",
-                "brand": product.get("brand", "Walmart"),
-                "currency": "USD",
-                "savings": product.get("savings", "")
-            }
-        else:
-            return {
-                "platform": "Walmart",
-                "found": False,
-                "message": result.get("error", "Product not found"),
-                "source": "walmart_mcp"
-            }
-    except Exception as e:
-        print(f"❌ Walmart MCP error: {e}")
-        import traceback
-        traceback.print_exc()
-        return {
-            "platform": "Walmart",
-            "found": False,
-            "message": str(e),
-            "source": "walmart_mcp"
-        }
-    finally:
-        if client:
-            try:
-                await client.disconnect()
-            except:
-                pass  # Ignore cleanup errors
-
-
 def search_platforms(search_input: Dict[str, Any]) -> Dict[str, Any]:
     """
     Main search function - searches all platforms and returns normalized results
@@ -1133,10 +1038,6 @@ def search_platforms(search_input: Dict[str, Any]) -> Dict[str, Any]:
             print("📡 Launching Amazon MCP search...")
             tasks.append(("Amazon", search_amazon_mcp(item)))
         
-        if WALMART_MCP_AVAILABLE:
-            print("📡 Launching Walmart MCP search...")
-            tasks.append(("Walmart", search_walmart_mcp(item)))
-        
         if not tasks:
             return {}
         
@@ -1157,12 +1058,14 @@ def search_platforms(search_input: Dict[str, Any]) -> Dict[str, Any]:
         return result_dict
     
     # Run parallel MCP searches
-    if ZEPTO_MCP_AVAILABLE or AMAZON_MCP_AVAILABLE or WALMART_MCP_AVAILABLE:
+    if ZEPTO_MCP_AVAILABLE or AMAZON_MCP_AVAILABLE:
         try:
             print(f"🔍 Searching for '{item}' across MCP servers...")
+            # Always use asyncio.run for consistency since this is a sync function
             mcp_results = asyncio.run(search_all_mcp())
         except Exception as e:
             print(f"⚠️ MCP search error: {e}")
+            mcp_results = {}
     
     # Collect successful results
     successful_results = []

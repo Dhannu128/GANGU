@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Mic, MicOff } from 'lucide-react'
+import { Mic, MicOff, Languages } from 'lucide-react'
 import { useGANGUStore } from '@/lib/store'
 
 interface VoiceInputProps {
@@ -9,14 +9,13 @@ interface VoiceInputProps {
 }
 
 export default function VoiceInput({ onTranscription }: VoiceInputProps) {
-  const { isListening, setListening, transcription, setTranscription } = useGANGUStore()
+  const { isListening, setListening, transcription, setTranscription, isProcessing } = useGANGUStore()
   const [isSupported, setIsSupported] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
   useEffect(() => {
-    // Check if browser supports MediaRecorder
-    setIsSupported('MediaRecorder' in window)
+    setIsSupported(typeof window !== 'undefined' && 'MediaRecorder' in window)
   }, [])
 
   const startListening = async () => {
@@ -29,32 +28,21 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
       setListening(true)
       audioChunksRef.current = []
 
-      // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      
-      // Create MediaRecorder
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data)
-        }
+        if (event.data.size > 0) audioChunksRef.current.push(event.data)
       }
 
       mediaRecorder.onstop = async () => {
-        // Create audio blob
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        
-        // Send to Whisper API
         await transcribeAudio(audioBlob)
-        
-        // Stop all tracks
-        stream.getTracks().forEach(track => track.stop())
+        stream.getTracks().forEach((t) => t.stop())
       }
 
       mediaRecorder.start()
-      
     } catch (error) {
       console.error('Error starting recording:', error)
       alert('Could not access microphone. Please check permissions.')
@@ -76,11 +64,11 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
 
       const response = await fetch('http://localhost:8000/api/voice/whisper', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
 
       const data = await response.json()
-      
+
       if (data.success && data.text) {
         setTranscription(data.text)
         onTranscription(data.text)
@@ -93,61 +81,77 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
     }
   }
 
+  const disabled = !isSupported || isProcessing
+
   return (
-    <div className="flex flex-col items-center space-y-6">
-      {/* Main Mic Button with enhanced styling */}
+    <div className="flex flex-col items-center gap-7">
+      {/* Mic button with concentric rings */}
       <div className="relative">
-        {/* Pulsing ring effect when listening */}
         {isListening && (
           <>
-            <div className="absolute inset-0 rounded-full bg-blue-500 opacity-20 animate-ping"></div>
-            <div className="absolute inset-0 rounded-full bg-blue-500 opacity-30 pulse-glow"></div>
+            <span className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping" />
+            <span className="absolute -inset-3 rounded-full border border-rose-400/30" />
+            <span className="absolute -inset-6 rounded-full border border-rose-400/15" />
           </>
         )}
-        
+
         <button
           onClick={isListening ? stopListening : startListening}
-          className={`relative mic-button ${isListening ? 'active' : ''} transition-all duration-300 hover:scale-105`}
-          disabled={!isSupported}
+          className={`mic-button ${isListening ? 'active' : ''}`}
+          disabled={disabled}
+          aria-label={isListening ? 'Stop recording' : 'Start recording'}
         >
-          {isListening ? (
-            <MicOff className="w-10 h-10" />
-          ) : (
-            <Mic className="w-10 h-10" />
-          )}
+          {isListening ? <MicOff className="w-12 h-12" strokeWidth={2} /> : <Mic className="w-12 h-12" strokeWidth={2} />}
         </button>
       </div>
 
-      {/* Status Text */}
-      <div className="text-center">
+      {/* Status */}
+      <div className="text-center min-h-[68px]">
         {isListening ? (
-          <div className="space-y-3">
-            <p className="text-xl font-bold text-blue-400 animate-pulse">
-              सुन रहा हूँ... / Listening...
+          <div className="flex flex-col items-center gap-3 animate-fade-in">
+            <p className="text-lg font-bold text-rose-300">
+              सुन रहा हूँ <span className="text-slate-500 font-normal">·</span> Listening
             </p>
-            <div className="flex justify-center space-x-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce shadow-lg" style={{ animationDelay: '0s' }}></div>
-              <div className="w-3 h-3 bg-purple-500 rounded-full animate-bounce shadow-lg" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-3 h-3 bg-cyan-500 rounded-full animate-bounce shadow-lg" style={{ animationDelay: '0.4s' }}></div>
+            <div className="flex items-end gap-1 h-4">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span
+                  key={i}
+                  className="w-1 rounded-full bg-gradient-to-t from-rose-500 to-rose-300"
+                  style={{
+                    height: '100%',
+                    animation: `voicewave 0.9s ease-in-out ${i * 0.12}s infinite`,
+                  }}
+                />
+              ))}
             </div>
           </div>
         ) : (
-          <div>
-            <p className="text-slate-300 font-medium text-lg">
-              {isSupported ? '🎤 Tap to speak' : '❌ Voice not supported'}
+          <div className="animate-fade-in">
+            <p className="text-base font-semibold text-slate-200 mb-1.5">
+              {isSupported ? 'Tap to speak' : 'Voice not supported in this browser'}
             </p>
-            <p className="text-slate-500 text-sm mt-1">Hindi, English, or Hinglish</p>
+            <p className="text-sm text-slate-500 inline-flex items-center gap-1.5">
+              <Languages className="w-3.5 h-3.5" />
+              हिंदी · English · Hinglish
+            </p>
           </div>
         )}
       </div>
 
-      {/* Live Transcription */}
+      {/* Live transcription */}
       {transcription && (
-        <div className="mt-2 p-5 bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-2xl max-w-md animate-fade-in shadow-xl border border-blue-500/30">
-          <p className="text-xs text-blue-300 mb-2 uppercase tracking-wide font-semibold">You said:</p>
-          <p className="text-lg text-white font-medium">{transcription}</p>
+        <div className="w-full max-w-xl glass rounded-2xl p-5 animate-rise">
+          <p className="text-[10px] text-amber-300 mb-2 uppercase tracking-widest font-bold">You said</p>
+          <p className="text-base text-white font-medium leading-relaxed">{transcription}</p>
         </div>
       )}
+
+      <style jsx global>{`
+        @keyframes voicewave {
+          0%, 100% { transform: scaleY(0.4); }
+          50%      { transform: scaleY(1); }
+        }
+      `}</style>
     </div>
   )
 }

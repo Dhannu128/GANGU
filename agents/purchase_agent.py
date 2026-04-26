@@ -619,6 +619,134 @@ chat_history = [
 
 # ---------------- HELPER FUNCTIONS ---------------- #
 
+def normalize_product_name(product_name: str) -> str:
+    """Normalize product names to match Zepto catalog"""
+    if not product_name:
+        return product_name
+    
+    # Convert to lowercase and strip whitespace
+    normalized = product_name.lower().strip()
+    
+    # Common product name mappings
+    name_mappings = {
+        # Plural to singular
+        "tomatoes": "tomato",
+        "potatoes": "potato", 
+        "onions": "onion",
+        "eggs": "egg",
+        
+        # Hindi to English
+        "tamatar": "tomato",
+        "aloo": "potato",
+        "pyaz": "onion",
+        "ande": "eggs",
+        "doodh": "milk",
+        "roti": "bread",
+        "chawal": "rice",
+        
+        # Common variations
+        "tomato": "tomato",  # Ensure it stays as is
+        "potato": "potato",
+        "onion": "onion",
+    }
+    
+    # Check if we have a direct mapping
+    if normalized in name_mappings:
+        return name_mappings[normalized]
+    
+    # Remove common suffixes (kg, gram, etc.)
+    import re
+    normalized = re.sub(r'\s*(kg|gram|g|liter|l|piece|pieces)\s*$', '', normalized)
+    
+    # Try mapping again after cleaning
+    if normalized in name_mappings:
+        return name_mappings[normalized]
+    
+    return normalized
+
+def get_similar_products(product_name: str) -> list[str]:
+    """Get similar/alternative products for out of stock items"""
+    if not product_name:
+        return []
+    
+    # Convert to lowercase for matching
+    product_lower = product_name.lower().strip()
+    
+    # Define product categories and alternatives - CONFIRMED AVAILABLE PRODUCTS
+    product_alternatives = {
+        # Beverages (confirmed available)
+        "tea": ["coffee", "juice", "soft drink"],
+        "coffee": ["tea", "juice", "soft drink"],
+        "juice": ["soft drink", "tea", "coffee"],
+        "soft drink": ["juice", "tea", "coffee"],
+        "water bottle": ["soft drink", "juice"],
+        
+        # Vegetables (confirmed available)
+        "potato": ["onion", "tomato"],
+        "onion": ["potato", "tomato"],
+        "tomato": ["potato", "onion"],
+        
+        # Fruits (confirmed available)
+        "apple": ["banana", "orange"],
+        "banana": ["apple", "orange"],
+        "orange": ["apple", "banana"],
+        
+        # Dairy (confirmed available)
+        "milk": ["curd", "butter", "paneer"],
+        "eggs": ["milk", "paneer", "butter"],
+        "paneer": ["milk", "curd", "eggs"],
+        "butter": ["milk", "curd", "paneer"],
+        "curd": ["milk", "paneer", "butter"],
+        
+        # Staples (confirmed available)
+        "rice": ["wheat flour", "bread"],
+        "wheat flour": ["rice", "bread"],
+        "bread": ["rice", "wheat flour"],
+        "sugar": ["salt"],
+        "salt": ["sugar"],
+        "oil": ["butter"],
+        
+        # Snacks (confirmed available)
+        "biscuits": ["chips", "namkeen"],
+        "chips": ["biscuits", "namkeen"],
+        "namkeen": ["biscuits", "chips"],
+        "maggi": ["bread", "biscuits"],
+        
+        # Personal Care (confirmed available)
+        "toothpaste": ["soap", "shampoo"],
+        "soap": ["toothpaste", "shampoo", "detergent"],
+        "shampoo": ["soap", "toothpaste", "detergent"],
+        "detergent": ["soap", "shampoo"],
+    }
+    
+    # Check for direct match
+    if product_lower in product_alternatives:
+        return product_alternatives[product_lower]
+    
+    # Check for partial matches
+    for key, alternatives in product_alternatives.items():
+        if key in product_lower or product_lower in key:
+            return alternatives
+    
+    # Default alternatives based on category keywords - USE CONFIRMED AVAILABLE PRODUCTS
+    if any(keyword in product_lower for keyword in ['chai', 'tea', 'drink', 'beverage']):
+        return ["tea", "coffee", "juice", "soft drink"]
+    elif any(keyword in product_lower for keyword in ['coffee', 'latte', 'cappuccino']):
+        return ["coffee", "tea", "juice", "soft drink"]
+    elif any(keyword in product_lower for keyword in ['cold', 'iced', 'cool']):
+        return ["soft drink", "juice", "water bottle"]
+    elif any(keyword in product_lower for keyword in ['milk', 'dairy']):
+        return ["milk", "curd", "butter", "paneer"]
+    elif any(keyword in product_lower for keyword in ['vegetable', 'veggie']):
+        return ["potato", "onion", "tomato"]
+    elif any(keyword in product_lower for keyword in ['fruit']):
+        return ["apple", "banana", "orange"]
+    elif any(keyword in product_lower for keyword in ['snack', 'eat']):
+        return ["biscuits", "chips", "namkeen"]
+    else:
+        # Generic fallback - most popular available items
+        return ["tea", "coffee", "milk", "potato"]
+
 def generate_order_hash(platform: str, product_id: str, user_id: str = "default_user") -> str:
     """Generate unique hash for idempotency check"""
     today = datetime.now().strftime("%Y-%m-%d")
@@ -748,7 +876,8 @@ def execute_purchase_with_retry(
     platform: str,
     product: Dict[str, Any],
     delivery: Dict[str, Any],
-    max_retries: int = MAX_RETRY_ATTEMPTS
+    max_retries: int = MAX_RETRY_ATTEMPTS,
+    cash_on_delivery: bool = False
 ) -> Dict[str, Any]:
     """
     Execute purchase with retry logic
@@ -767,78 +896,242 @@ def execute_purchase_with_retry(
         result["attempts"] = attempt
         
         try:
-            # Step 1: Add to cart
-            if DRY_RUN_MODE:
+            # Execute based on platform
+            if platform.lower() == "zepto" and not DRY_RUN_MODE and cash_on_delivery:
+                # Real Zepto execution using MCP client
+                print(f"   🛒 Executing Zepto Cash on Delivery order...")
+                
+                if ZEPTO_AVAILABLE:
+                    import asyncio
+                    
+                    # Use asyncio to run the async Zepto client
+                    async def execute_zepto_order():
+                        # Get the correct server script path
+                        server_script_path = gangu_root / "zepto-cafe-mcp" / "zepto_mcp_server.py"
+                        zepto_client = ZeptoMCPClient(str(server_script_path))
+                        try:
+                            # Connect and start order
+                            await zepto_client.connect()
+                            
+                            # Start Zepto order - the MCP server handles cash on delivery automatically
+                            original_product_name = product.get('name', 'tea')
+                            normalized_product_name = normalize_product_name(original_product_name)
+                            print(f"   📦 Starting Zepto order for: {original_product_name} → {normalized_product_name}")
+                            
+                            order_result = await zepto_client.start_zepto_order(normalized_product_name)
+                            print(f"   ✅ Zepto order result: {order_result}")
+                            
+                            await zepto_client.disconnect()
+                            return order_result
+                            
+                        except Exception as e:
+                            await zepto_client.disconnect()
+                            raise e
+                    
+                    # Run the async order
+                    order_result = asyncio.run(execute_zepto_order())
+                    
+                    # Extract message from dict response
+                    if isinstance(order_result, dict):
+                        order_message = order_result.get('message', str(order_result)).lower()
+                        order_success = order_result.get('success', False)
+                    else:
+                        order_message = str(order_result).lower()
+                        order_success = True
+                    
+                    # Process the result - check for successful order placement
+                    if order_success and ("order placed" in order_message or "successfully" in order_message):
+                        order_id = f"ZEPTO_COD_{int(time.time())}"
+                        transaction_id = f"COD_TXN_{int(time.time())}"
+                        
+                        result["steps_completed"].extend([
+                            {
+                                "step": "zepto_order_start",
+                                "status": "success",
+                                "timestamp": datetime.now().isoformat()
+                            },
+                            {
+                                "step": "cash_on_delivery_selection",
+                                "status": "success",
+                                "timestamp": datetime.now().isoformat()
+                            },
+                            {
+                                "step": "order_placement",
+                                "status": "success",
+                                "timestamp": datetime.now().isoformat()
+                            }
+                        ])
+                        
+                        result["status"] = "success"
+                        result["order_id"] = order_id
+                        result["transaction_id"] = transaction_id
+                        result["payment_method"] = "cash_on_delivery"
+                        result["order_details"] = order_result
+                        
+                        return result
+                    
+                    elif "out of stock" in order_message:
+                        # Product is out of stock - try similar alternatives
+                        original_product = product.get('name', 'unknown')
+                        similar_products = get_similar_products(original_product)
+                        
+                        print(f"   ⚠️ '{original_product}' is out of stock")
+                        print(f"   🔄 Trying similar products: {similar_products}")
+                        
+                        for similar_product in similar_products:
+                            print(f"   📦 Attempting alternative: {similar_product}")
+                            
+                            # Try ordering the similar product
+                            async def try_similar_order():
+                                server_script_path = gangu_root / "zepto-cafe-mcp" / "zepto_mcp_server.py"
+                                zepto_client = ZeptoMCPClient(str(server_script_path))
+                                try:
+                                    await zepto_client.connect()
+                                    similar_result = await zepto_client.start_zepto_order(similar_product)
+                                    await zepto_client.disconnect()
+                                    return similar_result
+                                except Exception as e:
+                                    await zepto_client.disconnect()
+                                    raise e
+                            
+                            try:
+                                similar_result = asyncio.run(try_similar_order())
+                                
+                                if isinstance(similar_result, dict):
+                                    similar_message = similar_result.get('message', '').lower()
+                                    similar_success = similar_result.get('success', False)
+                                    
+                                    if similar_success and "out of stock" not in similar_message and "not found" not in similar_message:
+                                        # Success with similar product!
+                                        order_id = f"ZEPTO_COD_{int(time.time())}"
+                                        transaction_id = f"COD_TXN_{int(time.time())}"
+                                        
+                                        result["status"] = "success"
+                                        result["order_id"] = order_id
+                                        result["transaction_id"] = transaction_id
+                                        result["payment_method"] = "cash_on_delivery"
+                                        result["original_product"] = original_product
+                                        result["substituted_product"] = similar_product
+                                        
+                                        print(f"   ✅ Alternative order successful!")
+                                        print(f"   📦 Ordered: {similar_product} (substitute for {original_product})")
+                                        print(f"   🆔 Order ID: {order_id}")
+                                        return result
+                                    elif "out of stock" in similar_message:
+                                        print(f"   ❌ '{similar_product}' also out of stock")
+                                        continue
+                                    else:
+                                        print(f"   ❌ '{similar_product}' failed: {similar_message[:50]}...")
+                                        continue
+                                        
+                            except Exception as e:
+                                print(f"   ❌ Error trying '{similar_product}': {str(e)[:50]}...")
+                                continue
+                        
+                        # All similar products failed
+                        raise Exception(f"'{original_product}' and all alternatives out of stock")
+                    
+                    elif "not found in catalog" in order_message:
+                        # Product not found - try with normalized name
+                        original_product = product.get('name', 'unknown')
+                        normalized_product = normalize_product_name(original_product)
+                        
+                        if normalized_product != original_product:
+                            print(f"   🔄 Product '{original_product}' not found, trying '{normalized_product}'...")
+                            
+                            # Retry with normalized name
+                            async def retry_zepto_order():
+                                server_script_path = gangu_root / "zepto-cafe-mcp" / "zepto_mcp_server.py"
+                                zepto_client = ZeptoMCPClient(str(server_script_path))
+                                try:
+                                    await zepto_client.connect()
+                                    retry_result = await zepto_client.start_zepto_order(normalized_product)
+                                    await zepto_client.disconnect()
+                                    return retry_result
+                                except Exception as e:
+                                    await zepto_client.disconnect()
+                                    raise e
+                            
+                            retry_result = asyncio.run(retry_zepto_order())
+                            
+                            if isinstance(retry_result, dict):
+                                retry_message = retry_result.get('message', '').lower()
+                                retry_success = retry_result.get('success', False)
+                                
+                                if retry_success and ("order placed" in retry_message or "successfully" in retry_message):
+                                    order_id = f"ZEPTO_COD_{int(time.time())}"
+                                    transaction_id = f"COD_TXN_{int(time.time())}"
+                                    
+                                    result["status"] = "success"
+                                    result["order_id"] = order_id
+                                    result["transaction_id"] = transaction_id
+                                    result["payment_method"] = "cash_on_delivery"
+                                    
+                                    print(f"   ✅ Zepto COD order successful with normalized name!")
+                                    print(f"   🆔 Order ID: {order_id}")
+                                    return result
+                        
+                        # Product still not found
+                        raise Exception(f"Product '{original_product}' not available on Zepto")
+                    
+                    else:
+                        # Order failed for other reason
+                        failure_reason = order_result.get('error', order_message) if isinstance(order_result, dict) else str(order_result)
+                        raise Exception(f"Zepto order failed: {failure_reason}")
+                        
+                else:
+                    raise Exception("Zepto MCP client not available")
+            
+            elif DRY_RUN_MODE:
+                # Dry run mode
                 print(f"   [DRY RUN] Would add {product['name']} to cart on {platform}")
-                cart_success = True
-            else:
-                # Real implementation would call MCP client
-                cart_success = True  # Simulated
-            
-            if not cart_success:
-                raise Exception("Failed to add to cart")
-            
-            result["steps_completed"].append({
-                "step": "add_to_cart",
-                "status": "success",
-                "timestamp": datetime.now().isoformat()
-            })
-            time.sleep(0.5)  # Simulate API call
-            
-            # Step 2: Verify cart
-            if DRY_RUN_MODE:
-                print(f"   [DRY RUN] Would verify cart contents")
-                verify_success = True
-            else:
-                verify_success = True  # Simulated
-            
-            if not verify_success:
-                raise Exception("Cart verification failed")
-            
-            result["steps_completed"].append({
-                "step": "verify_cart",
-                "status": "success",
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            # Step 3: Checkout
-            if DRY_RUN_MODE:
-                print(f"   [DRY RUN] Would proceed to checkout")
+                print(f"   [DRY RUN] Would proceed with {'Cash on Delivery' if cash_on_delivery else 'default payment'}")
+                
                 order_id = f"DRY_RUN_{platform.upper()}_{int(time.time())}"
                 transaction_id = f"TXN_DRY_RUN_{int(time.time())}"
+                
+                result["steps_completed"].extend([
+                    {
+                        "step": "add_to_cart",
+                        "status": "success",
+                        "timestamp": datetime.now().isoformat()
+                    },
+                    {
+                        "step": "checkout",
+                        "status": "success",
+                        "timestamp": datetime.now().isoformat()
+                    },
+                    {
+                        "step": "payment_confirmation",
+                        "status": "success",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                ])
+                
+                result["status"] = "success"
+                result["order_id"] = order_id
+                result["transaction_id"] = transaction_id
+                
+                time.sleep(1)  # Simulate processing time
+                return result
+            
             else:
-                # Real implementation would call MCP client checkout
-                order_id = f"{platform.upper()}_ORD_{int(time.time())}"
-                transaction_id = f"TXN_{int(time.time())}"
-            
-            result["steps_completed"].append({
-                "step": "checkout",
-                "status": "success",
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            # Step 4: Payment confirmation
-            if DRY_RUN_MODE:
-                print(f"   [DRY RUN] Would confirm payment")
-                payment_success = True
-            else:
-                payment_success = True  # Simulated
-            
-            if not payment_success:
-                raise Exception("Payment confirmation failed")
-            
-            result["steps_completed"].append({
-                "step": "payment_confirmation",
-                "status": "success",
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            # Success!
-            result["status"] = "success"
-            result["order_id"] = order_id
-            result["transaction_id"] = transaction_id
-            
-            return result
+                # Fallback simulation for other platforms
+                print(f"   ⚠️ Platform {platform} not supported for real orders, using simulation")
+                order_id = f"{platform.upper()}_SIM_{int(time.time())}"
+                transaction_id = f"TXN_SIM_{int(time.time())}"
+                
+                result["steps_completed"].append({
+                    "step": "simulated_order",
+                    "status": "success", 
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+                result["status"] = "success"
+                result["order_id"] = order_id
+                result["transaction_id"] = transaction_id
+                
+                return result
         
         except Exception as e:
             result["failure_reason"] = str(e)
@@ -960,6 +1253,12 @@ def execute_purchase(decision_input: Dict[str, Any]) -> Dict[str, Any]:
     print(f"\n🚀 PHASE 3: Purchase Execution")
     print(f"   Platform: {selected_platform}")
     
+    # Enable cash on delivery for Zepto orders
+    cash_on_delivery = selected_platform.lower() == 'zepto'
+    
+    if cash_on_delivery:
+        print(f"   💳 Payment Method: Cash on Delivery (COD)")
+    
     if DRY_RUN_MODE:
         print(f"   🧪 DRY RUN MODE - Simulating purchase")
     
@@ -967,7 +1266,8 @@ def execute_purchase(decision_input: Dict[str, Any]) -> Dict[str, Any]:
         platform=selected_platform,
         product=product,
         delivery=delivery,
-        max_retries=MAX_RETRY_ATTEMPTS
+        max_retries=MAX_RETRY_ATTEMPTS,
+        cash_on_delivery=cash_on_delivery
     )
     
     # PHASE 4: Handle Result

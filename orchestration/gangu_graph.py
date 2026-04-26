@@ -416,132 +416,102 @@ def decision_agent(state: GANGUState) -> GANGUState:
     return state
 
 
-# ==================== AGENT 6: PURCHASE EXECUTION (YOUR AGENT) ====================
+# ==================== AGENT 6: PURCHASE EXECUTION (SIMULATED) ====================
 def purchase_agent(state: GANGUState) -> GANGUState:
     """
-    YOUR Purchase Agent
-    Safely executes purchase decisions with validation, risk management, and failure recovery
+    Purchase Execution Agent - Now integrated with real purchase agent for Zepto COD
     """
-    print("\n💳 [Agent 6] Purchase Execution Agent (Your Implementation)")
+    print("\n💳 [Agent 6] Purchase Execution Agent (Real Implementation)")
     
     decision_type = state.get("decision_type", "unknown")
     selected_option = state.get("selected_option")
-    decision_results = state.get("decision_results", {})
     
-    # Import your Purchase Agent
-    try:
-        import sys
-        import os
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if parent_dir not in sys.path:
-            sys.path.insert(0, parent_dir)
-        
-        from agents.purchase_agent import execute_purchase
-        
-        # Check if we should actually purchase
-        if decision_type == "clarify_needed":
-            print("   ⚠️  Clarification needed, skipping purchase")
-            state["purchase_status"] = "needs_clarification"
-            state["order_id"] = None
-            return state
-        elif decision_type == "no_good_option":
-            print("   ✗ No good option available, skipping purchase")
-            state["purchase_status"] = "no_option"
-            state["order_id"] = None
-            return state
-        
-        if not selected_option:
-            print("   ✗ No option selected, cannot purchase")
-            state["purchase_status"] = "failed"
-            state["order_id"] = None
-            return state
-        
-        # Prepare decision input for Purchase Agent
-        decision_input = {
-            "final_decision": decision_results.get("final_decision", {
-                "selected_platform": selected_option.get("platform"),
-                "product": {
-                    "name": state.get("item_name"),
-                    "brand": selected_option.get("brand", "Unknown"),
-                    "product_id": selected_option.get("product_id", "unknown"),
-                    "quantity": state.get("quantity"),
-                    "price": selected_option.get("price", 0),
-                    "currency": "INR"
-                },
-                "delivery": {
-                    "eta_hours": selected_option.get("delivery_time_hours", 24),
-                    "delivery_date": selected_option.get("delivery_date", "TBD"),
-                    "slot": "standard"
-                },
-                "confidence_score": decision_results.get("confidence_score", 0.8),
-                "fallback_options": decision_results.get("fallback_options", [])
-            }),
-            "user_context": {
-                "urgency": state.get("urgency", "normal"),
-                "budget_limit": 1000.00
-            }
-        }
-        
-        # Handle confirmation requirement
-        if decision_type == "confirm_with_user":
-            print("   ⚠️  High-risk order - confirmation required")
-            state["purchase_status"] = "pending_confirmation"
-            state["order_id"] = None
-            # Store the decision for later execution after confirmation
-            state["pending_purchase_decision"] = decision_input
-            return state
-        
-        # Execute purchase using your Purchase Agent
-        print("   🚀 Executing purchase with validation and risk management...")
-        purchase_result = execute_purchase(decision_input)
-        
-        # Extract results
-        purchase_status = purchase_result.get("purchase_status", "failed")
-        order_id = purchase_result.get("execution_details", {}).get("order_id")
-        
-        # Update state
-        state["order_id"] = order_id
-        state["purchase_status"] = purchase_status
-        state["purchase_result"] = purchase_result
-        
-        # Log result
-        if purchase_status == "success":
-            print(f"   ✅ Purchase successful!")
-            print(f"   ✅ Order ID: {order_id}")
-        elif purchase_status == "pending":
-            print(f"   ⚠️  Purchase pending confirmation")
-        elif purchase_status == "blocked":
-            print(f"   🚨 Purchase blocked due to risk")
-        else:
-            print(f"   ❌ Purchase failed")
-        
+    # Check if we should actually purchase
+    if decision_type == "auto_buy":
+        print("   ✓ Auto-buy approved, proceeding with purchase...")
+    elif decision_type == "confirm_with_user":
+        print("   ⚠️  Confirmation required from user")
+        state["purchase_status"] = "pending_confirmation"
         return state
-        
-    except ImportError as e:
-        print(f"   ❌ Failed to import Purchase Agent: {e}")
-        print("   ⚠️  Falling back to basic purchase simulation")
-        
-        # Fallback to basic simulation
-        if decision_type == "auto_buy":
-            order_id = f"ORD{datetime.now().strftime('%Y%m%d%H%M%S')}"
-            state["order_id"] = order_id
-            state["purchase_status"] = "confirmed"
-            print(f"   🛒 Simulated order: {order_id}")
-        else:
-            state["order_id"] = None
-            state["purchase_status"] = "pending_confirmation"
-        
+    elif decision_type == "clarify_needed":
+        print("   ⚠️  Clarification needed, skipping purchase")
+        state["purchase_status"] = "needs_clarification"
         return state
-    except Exception as e:
-        print(f"   ❌ Purchase Agent error: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        state["order_id"] = None
+    elif decision_type == "no_good_option":
+        print("   ✗ No good option available, skipping purchase")
+        state["purchase_status"] = "no_option"
+        return state
+    
+    if not selected_option:
+        print("   ✗ No option selected, cannot purchase")
         state["purchase_status"] = "failed"
-        state["purchase_error"] = str(e)
-        
         return state
+    
+    platform = selected_option.get("platform", "Unknown")
+    item_name = state.get("item_name", "Item")
+    
+    # For Zepto orders, use the real purchase agent
+    if platform.lower() == "zepto":
+        print("   🛒 Using real Zepto purchase agent for Cash on Delivery...")
+        
+        try:
+            # Import and use the actual purchase agent
+            from agents.purchase_agent import execute_purchase
+            
+            # Prepare input for purchase agent
+            purchase_input = {
+                "final_decision": {
+                    "selected_platform": platform,
+                    "product": {
+                        "name": item_name,
+                        "price": selected_option.get("price", 30),
+                        "quantity": state.get("quantity", 1),
+                        "product_id": item_name.lower().replace(" ", "_")
+                    },
+                    "delivery": {
+                        "delivery_date": "today",
+                        "slot": "within 1 hour"
+                    }
+                },
+                "user_context": {
+                    "payment_preference": "cash_on_delivery",
+                    "platform_preference": "zepto"
+                }
+            }
+            
+            # Execute purchase
+            purchase_result = execute_purchase(purchase_input)
+            
+            # Process result
+            if purchase_result.get("purchase_status") == "success":
+                order_id = purchase_result.get("execution_details", {}).get("order_id")
+                state["order_id"] = order_id
+                state["purchase_status"] = "confirmed"
+                state["purchase_details"] = purchase_result
+                
+                print(f"   ✅ Zepto COD order successful!")
+                print(f"   🆔 Order ID: {order_id}")
+                print(f"   💳 Payment: Cash on Delivery")
+                
+            else:
+                state["purchase_status"] = "failed"
+                state["purchase_error"] = purchase_result.get("user_message", "Order failed")
+                print(f"   ❌ Zepto order failed: {purchase_result.get('user_message')}")
+                
+        except Exception as e:
+            print(f"   ❌ Error in purchase execution: {str(e)}")
+            state["purchase_status"] = "failed"
+            state["purchase_error"] = f"Purchase agent error: {str(e)}"
+    
+    else:
+        # For other platforms, simulate (as before)
+        print(f"   🛒 Simulating order placement on {platform}...")
+        order_id = f"ORD{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        state["order_id"] = order_id
+        state["purchase_status"] = "confirmed"
+        print(f"   ✓ Simulated order confirmed: {order_id}")
+    
+    return state
 
 
 # ==================== AGENT 7: NOTIFICATION ====================
@@ -562,33 +532,12 @@ def notification_agent(state: GANGUState) -> GANGUState:
     why_option = explanation.get("why_this_option", "")
     
     # Build response based on decision type
-    if decision_type == "auto_buy" and purchase_status in ["confirmed", "success"]:
+    if decision_type == "auto_buy" and purchase_status == "confirmed":
         selected = state.get("selected_option", {})
-        purchase_result = state.get("purchase_result", {})
-        
-        # Get details from purchase result if available
-        if purchase_result:
-            order_confirmation = purchase_result.get("order_confirmation", {})
-            execution_details = purchase_result.get("execution_details", {})
-            validation_results = purchase_result.get("validation_results", {})
-            
-            platform = execution_details.get("platform_used", selected.get("platform", "Unknown"))
-            price = f"₹{order_confirmation.get('final_price', selected.get('price', 'N/A'))}"
-            delivery = order_confirmation.get("delivery_date", selected.get("delivery_time_label", "Soon"))
-            order_id = execution_details.get("order_id", state.get("order_id", "N/A"))
-            risk_level = validation_results.get("risk_level", "low")
-            fallback_used = purchase_result.get("fallback_used", False)
-            
-            risk_emoji = "🟢" if risk_level == "low" else "🟡" if risk_level == "medium" else "🔴"
-            fallback_note = f"\n   ⚠️ Note: {purchase_result.get('user_message', '')}" if fallback_used else ""
-        else:
-            # Fallback to basic info
-            platform = selected.get("platform", "Unknown")
-            price = selected.get("unit_price_label", selected.get("price", "N/A"))
-            delivery = selected.get("delivery_time_label", "Soon")
-            order_id = state.get("order_id", "N/A")
-            risk_emoji = "🟢"
-            fallback_note = ""
+        platform = selected.get("platform", "Unknown")
+        price = selected.get("unit_price_label", selected.get("price", "N/A"))
+        delivery = selected.get("delivery_time_label", "Soon")
+        order_id = state.get("order_id", "N/A")
         
         response = f"""✅ Order Successful!
 
@@ -599,7 +548,6 @@ def notification_agent(state: GANGUState) -> GANGUState:
    Price: {price}
    Delivery: {delivery}
    Order ID: {order_id}
-   Risk: {risk_emoji}{fallback_note}
 
 {why_option}
 

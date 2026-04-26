@@ -196,6 +196,38 @@ class ZeptoMCPClient:
             "found_count": sum(1 for r in results if r.get("found")),
             "results": results
         }
+
+    async def start_zepto_order(self, product_name: str) -> dict:
+        """
+        Start a Zepto order using the MCP server tool
+        
+        Args:
+            product_name: Name of the product to order
+            
+        Returns:
+            dict with order result
+        """
+        if not self.session:
+            await self.connect()
+        
+        try:
+            # Call the start_zepto_order tool on the server
+            result = await self.session.call_tool("start_zepto_order", {
+                "product_name": product_name
+            })
+            
+            # Extract the result from MCP response
+            if result.content and len(result.content) > 0:
+                content = result.content[0]
+                if hasattr(content, 'text'):
+                    return {"success": True, "message": content.text, "raw_result": str(result)}
+                else:
+                    return {"success": True, "message": str(content), "raw_result": str(result)}
+            else:
+                return {"success": False, "error": "No content in response", "raw_result": str(result)}
+                
+        except Exception as e:
+            return {"success": False, "error": str(e)}
     
     async def get_server_status(self) -> dict:
         """Get the status of the MCP server"""

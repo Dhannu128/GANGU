@@ -2,18 +2,18 @@
 
 import { useState } from 'react'
 import { useGANGUStore } from '@/lib/store'
-import { Send } from 'lucide-react'
+import { ArrowUp, Sparkles } from 'lucide-react'
 
 interface TextInputProps {
   onSend: (message: string) => void
 }
 
 const SUGGESTIONS = [
-  "Order groceries",
-  "Compare prices",
-  "White chane le aao",
-  "Doodh khatam ho gaya",
-  "Atta mangwao"
+  '2 kg atta order karo',
+  'Doodh khatam ho gaya',
+  'White chane le aao',
+  'Order milk and bread',
+  'Chai patti chahiye',
 ]
 
 export default function TextInput({ onSend }: TextInputProps) {
@@ -28,24 +28,25 @@ export default function TextInput({ onSend }: TextInputProps) {
     }
   }
 
-  const handleSuggestionClick = (suggestion: string) => {
-    if (!isProcessing) {
-      onSend(suggestion)
-    }
+  const handleSuggestionClick = (s: string) => {
+    if (!isProcessing) onSend(s)
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="w-full">
       {/* Suggestions */}
       {!isProcessing && message === '' && (
-        <div className="mb-4 flex flex-wrap gap-2 justify-center">
-          {SUGGESTIONS.map((suggestion, index) => (
+        <div className="mb-4 flex flex-wrap gap-2 justify-center animate-fade-in">
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 font-semibold uppercase tracking-widest mr-1 self-center">
+            <Sparkles className="w-3 h-3" /> Try
+          </span>
+          {SUGGESTIONS.map((suggestion, i) => (
             <button
-              key={index}
+              key={i}
               onClick={() => handleSuggestionClick(suggestion)}
-              className="px-4 py-2 bg-slate-700/50 text-slate-200 rounded-full text-sm 
-                       hover:bg-blue-600 hover:text-white transition-colors
-                       border border-slate-600 shadow-lg"
+              className="px-3.5 py-1.5 rounded-full text-sm text-slate-300 bg-white/[0.04]
+                         border border-white/10 hover:border-amber-500/40 hover:text-white
+                         hover:bg-amber-500/[0.06] transition-all duration-200"
             >
               {suggestion}
             </button>
@@ -53,29 +54,28 @@ export default function TextInput({ onSend }: TextInputProps) {
         </div>
       )}
 
-      {/* Text Input Form */}
+      {/* Input */}
       <form onSubmit={handleSubmit} className="relative">
         <input
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type your message... (e.g., White chane le aao)"
+          placeholder="Type your request, e.g. '2 kg atta order karo'"
           disabled={isProcessing}
-          className="w-full px-6 py-4 pr-14 rounded-full border-2 border-slate-600 
-                   focus:border-blue-500 focus:outline-none text-lg
-                   disabled:bg-slate-800 disabled:cursor-not-allowed
-                   shadow-lg bg-slate-800/50 text-white placeholder-slate-400"
+          className="input-base pr-16 text-base"
         />
         <button
           type="submit"
           disabled={!message.trim() || isProcessing}
-          className="absolute right-2 top-1/2 transform -translate-y-1/2
-                   w-10 h-10 rounded-full bg-blue-600 text-white
-                   flex items-center justify-center
-                   disabled:bg-slate-600 disabled:cursor-not-allowed
-                   hover:bg-blue-500 transition-colors shadow-lg"
+          aria-label="Send"
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-xl
+                     flex items-center justify-center text-white
+                     bg-gradient-to-br from-amber-400 to-orange-600
+                     shadow-glow-sm hover:shadow-glow disabled:opacity-40
+                     disabled:cursor-not-allowed disabled:from-slate-600 disabled:to-slate-700
+                     disabled:shadow-none transition-all"
         >
-          <Send className="w-5 h-5" />
+          <ArrowUp className="w-5 h-5" strokeWidth={2.5} />
         </button>
       </form>
     </div>

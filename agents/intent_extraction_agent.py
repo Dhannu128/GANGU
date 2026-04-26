@@ -246,7 +246,7 @@ def simple_fallback_parser(user_input: str) -> dict:
     if not detected_item:
         return None
     
-    buy_keywords = ["khatam", "order", "buy", "le ao", "lao", "chahiye", "mangao"]
+    buy_keywords = ["khatam", "order", "buy", "le ao", "lao", "chahiye", "mangao", "want", "need", "get", "from zepto", "through zepto"]
     has_buy_intent = any(kw in text_lower for kw in buy_keywords)
     
     urgent_keywords = ["urgent", "jaldi", "abhi", "turant"]
