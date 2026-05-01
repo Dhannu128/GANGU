@@ -59,9 +59,13 @@ app = FastAPI(
 )
 
 # CORS Configuration - Allow frontend to connect
+# Add prod URLs via FRONTEND_URLS env var (comma-separated), e.g.
+# FRONTEND_URLS=https://gangu.vercel.app,https://gangu-staging.vercel.app
+_default_origins = ["http://localhost:3000", "http://localhost:3001"]
+_extra_origins = [o.strip() for o in os.getenv("FRONTEND_URLS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Next.js default ports
+    allow_origins=_default_origins + _extra_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -676,6 +680,6 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8000,
+        port=int(os.getenv("PORT", "8000")),
         log_level="info"
     )

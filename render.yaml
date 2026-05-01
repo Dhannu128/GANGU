@@ -1,0 +1,33 @@
+# Render Blueprint — one-click deploy of the GANGU backend.
+# Push this file to GitHub, then in Render: New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: gangu-api
+    runtime: python
+    plan: free                 # bump to "starter" ($7/mo) if you need Playwright/MCP
+    region: oregon             # or singapore for India proximity
+    buildCommand: pip install -r config/requirements.txt && pip install -r api/requirements.txt
+    startCommand: python api/main.py
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: TOKENROUTER_API_KEY
+        sync: false            # paste in Render dashboard, never commit
+      - key: TOKENROUTER_BASE_URL
+        value: https://api.tokenrouter.com/v1
+      - key: LLM_MODEL
+        value: claude-haiku-4-5
+      - key: OPENAI_API_KEY
+        sync: false            # only needed for Whisper voice transcription
+      - key: LANGSMITH_TRACING
+        value: "true"
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_PROJECT
+        value: GANGU
+      - key: FRONTEND_URLS
+        sync: false            # set to your Vercel URL(s), comma-separated
+      - key: GANGU_DRY_RUN
+        value: "true"          # never place real Zepto orders from prod
