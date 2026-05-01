@@ -27,20 +27,12 @@ load_dotenv(dotenv_path=env_path)
 # Also try loading from current working directory
 load_dotenv()
 
-# Use the new google-genai package
-from google import genai
+# TokenRouter (OpenAI-compatible) → Claude Haiku 4.5 — see agents/llm.py
+from agents import llm as genai
 
 # ---------------- API CONFIGURATION ---------------- #
 
-# Use dedicated API key for Comparison Agent
-api_key = os.environ.get('GEMINI_API_KEY_COMPARISON') or os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
-if not api_key:
-    raise ValueError("❌ GEMINI_API_KEY environment variable not set")
-
-print(f"🔑 Comparison Agent using API key: ...{api_key[-8:]}")
-
-# Initialize the new GenAI client
-client = genai.Client(api_key=api_key)
+client = genai.Client()
 
 # ---------------- SYSTEM PROMPT ---------------- #
 
@@ -728,7 +720,7 @@ Now process the search results and create a comprehensive comparison analysis.
 
 # ---------------- MODEL INITIALIZATION ---------------- #
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = genai.get_model_name()
 
 # Chat history to maintain context
 chat_history = [
@@ -1051,19 +1043,10 @@ def compare_products(search_results: Dict[str, Any]) -> Dict[str, Any]:
                     }
             else:
                 print(f"❌ COMPARISON AGENT: API error - {error_str[:100]}")
-                return {
-                    "status": "failed",
-                    "error_type": "api_error",
-                    "agent": "comparison_agent",
-                    "error_details": error_str,
-                    "user_message": "❌ Comparison Agent API failed",
-                    "can_retry": False,
-                    "search_results_preserved": search_results,
-                    "metadata": {
-                        "timestamp": datetime.now().isoformat(),
-                        "failure_reason": "api_error"
-                    }
-                }
+                print("   ↳ Falling back to rule-based ranking so the pipeline can complete.")
+                fallback_result = create_fallback_comparison(search_results)
+                fallback_result.setdefault("comparison_summary", {})["api_error"] = error_str[:200]
+                return fallback_result
     
     # Should never reach here
     return {

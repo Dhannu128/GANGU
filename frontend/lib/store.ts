@@ -75,6 +75,14 @@ export interface Settings {
   higherContrast: boolean
 }
 
+export type ToastVariant = 'success' | 'error' | 'info'
+export interface Toast {
+  id: number
+  variant: ToastVariant
+  title: string
+  description?: string
+}
+
 interface GANGUStore {
   // Connection
   connected: boolean
@@ -101,6 +109,7 @@ interface GANGUStore {
   // Cancel
   isCancelling: boolean
   isCancelled: boolean
+  abortController: AbortController | null
 
   // Auth + user
   auth: AuthState
@@ -111,6 +120,9 @@ interface GANGUStore {
   savedLists: SavedList[]
   familyMembers: FamilyMember[]
   settings: Settings
+
+  // Toasts
+  toasts: Toast[]
 
   // Actions
   setConnected: (connected: boolean) => void
@@ -126,6 +138,7 @@ interface GANGUStore {
   setOrderPlaced: (placed: boolean, orderId?: string) => void
   setCancelling: (cancelling: boolean) => void
   setCancelled: (cancelled: boolean) => void
+  setAbortController: (controller: AbortController | null) => void
   resetSession: () => void
 
   // Auth actions
@@ -138,6 +151,10 @@ interface GANGUStore {
   removeSavedList: (id: string) => void
   inviteFamilyMember: (member: FamilyMember) => void
   removeFamilyMember: (id: string) => void
+
+  // Toasts
+  pushToast: (toast: Omit<Toast, 'id'>) => void
+  dismissToast: (id: number) => void
 }
 
 const DEMO_PAST_ORDERS: PastOrder[] = [
@@ -218,6 +235,7 @@ export const useGANGUStore = create<GANGUStore>()(
       orderId: null,
       isCancelling: false,
       isCancelled: false,
+      abortController: null,
 
       auth: { isAuthenticated: false, token: null },
       user: null,
@@ -226,6 +244,8 @@ export const useGANGUStore = create<GANGUStore>()(
       savedLists: [],
       familyMembers: [],
       settings: DEFAULT_SETTINGS,
+
+      toasts: [],
 
       setConnected: (connected) => set({ connected }),
       setSessionId: (sessionId) => set({ sessionId }),
@@ -250,7 +270,13 @@ export const useGANGUStore = create<GANGUStore>()(
       setRecommendation: (recommendation) => set({ recommendation }),
       setOrderPlaced: (placed, orderId) => set({ orderPlaced: placed, orderId: orderId || null }),
       setCancelling: (cancelling) => set({ isCancelling: cancelling }),
-      setCancelled: (cancelled) => set({ isCancelled: cancelled }),
+      setCancelled: (cancelled) =>
+        set(
+          cancelled
+            ? { isCancelled: true, isCancelling: false, isProcessing: false }
+            : { isCancelled: false }
+        ),
+      setAbortController: (controller) => set({ abortController: controller }),
 
       resetSession: () =>
         set({
@@ -304,6 +330,10 @@ export const useGANGUStore = create<GANGUStore>()(
       inviteFamilyMember: (member) => set((s) => ({ familyMembers: [...s.familyMembers, member] })),
       removeFamilyMember: (id) =>
         set((s) => ({ familyMembers: s.familyMembers.filter((m) => m.id !== id) })),
+
+      pushToast: (toast) =>
+        set((s) => ({ toasts: [...s.toasts, { ...toast, id: Date.now() + Math.random() }] })),
+      dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
     }),
     {
       name: 'gangu-store',

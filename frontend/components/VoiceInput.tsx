@@ -62,7 +62,8 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
       const formData = new FormData()
       formData.append('file', audioBlob, 'audio.webm')
 
-      const response = await fetch('http://localhost:8000/api/voice/whisper', {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiBase}/api/voice/whisper`, {
         method: 'POST',
         body: formData,
       })
@@ -97,7 +98,7 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
 
         <button
           onClick={isListening ? stopListening : startListening}
-          className={`mic-button ${isListening ? 'active' : ''}`}
+          className={`mic-button ${isListening ? 'active' : disabled ? '' : 'idle'}`}
           disabled={disabled}
           aria-label={isListening ? 'Stop recording' : 'Start recording'}
         >

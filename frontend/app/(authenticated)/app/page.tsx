@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGANGUStore } from '@/lib/store'
 import { processUserInput, confirmOrder } from '@/lib/api'
 import VoiceInput from '@/components/VoiceInput'
@@ -31,10 +31,27 @@ export default function AppHome() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [selectedProductIndex, setSelectedProductIndex] = useState(0)
 
+  // Abort controller for the in-flight chat/process request, so cancel can
+  // tear down the HTTP request immediately instead of waiting for the
+  // backend to finish the current agent.
+  const abortRef = useRef<AbortController | null>(null)
+  const { setAbortController } = useGANGUStore()
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
   const handleUserInput = async (message: string) => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setAbortController(controller)
+
     try {
       setProcessing(true)
-      const result = await processUserInput(message, sessionId || undefined)
+      const result = await processUserInput(message, sessionId || undefined, controller.signal)
       if (result.success) {
         setComparison(result.comparison)
         setRecommendation(result.recommendation)
@@ -46,11 +63,19 @@ export default function AppHome() {
           setSelectedProductIndex(result.comparison.recommended_index)
         }
       }
-    } catch (error) {
-      console.error('Error processing input:', error)
-      alert('Sorry, something went wrong. Please try again.')
+    } catch (error: any) {
+      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED' || controller.signal.aborted) {
+        // Cancelled by user — silent, store already updated by handleCancel.
+      } else {
+        console.error('Error processing input:', error)
+        alert('Sorry, something went wrong. Please try again.')
+      }
     } finally {
       setProcessing(false)
+      if (abortRef.current === controller) {
+        abortRef.current = null
+        setAbortController(null)
+      }
     }
   }
 

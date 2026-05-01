@@ -54,8 +54,16 @@ export const disconnectWebSocket = () => {
 }
 
 // === Order pipeline ===
-export const processUserInput = async (message: string, sessionId?: string) => {
-  const response = await api.post('/api/chat/process', { message, session_id: sessionId })
+export const processUserInput = async (
+  message: string,
+  sessionId?: string,
+  signal?: AbortSignal,
+) => {
+  const response = await api.post(
+    '/api/chat/process',
+    { message, session_id: sessionId },
+    { signal },
+  )
   return response.data
 }
 
@@ -157,6 +165,33 @@ export const verifyOtp = async (
 function phoneToName(phone: string): string {
   const last4 = phone.replace(/\D/g, '').slice(-4)
   return `Friend ${last4}`
+}
+
+export type SocialProvider = 'google' | 'whatsapp'
+
+export const socialSignIn = async (
+  provider: SocialProvider,
+  language: Language = 'hinglish'
+): Promise<OtpVerifyResult> => {
+  try {
+    const response = await api.post('/api/auth/social', { provider, language })
+    return response.data
+  } catch {
+    await sleep(800)
+    const seed = Math.floor(Math.random() * 9000) + 1000
+    return {
+      success: true,
+      token: `mock-${provider}-${Date.now()}`,
+      user: {
+        id: `user_${provider}_${seed}`,
+        name: provider === 'google' ? 'Asha Verma' : 'Lata Sharma',
+        phone: `+91 98xxxxx${seed.toString().slice(-3)}`,
+        language,
+        address: 'Home · 12, Rose Apt, Indore 452001',
+        isNewUser: true,
+      },
+    }
+  }
 }
 
 export default api

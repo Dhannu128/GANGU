@@ -2,6 +2,8 @@
 GANGU FastAPI Backend
 Exposes GANGU agents as REST API with WebSocket support for real-time updates
 """
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -20,15 +22,40 @@ if sys.platform == "win32":
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from orchestration.gangu_graph import create_gangu_graph
 from dotenv import load_dotenv
-
 load_dotenv()
+
+# --- LangSmith: disable cleanly when key is missing/placeholder so we don't
+# spam the console with 403s and slow each request down. ---
+def _is_real_key(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    v = value.strip().lower()
+    return len(v) >= 20 and not any(token in v for token in ("your", "placeholder", "here", "xxxx", "replace"))
+
+if not _is_real_key(os.getenv("LANGSMITH_API_KEY")):
+    os.environ["LANGSMITH_TRACING"] = "false"
+    os.environ["LANGCHAIN_TRACING_V2"] = "false"
+    logging.getLogger("langsmith").setLevel(logging.CRITICAL)
+
+from orchestration.gangu_graph import create_gangu_graph
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global gangu_graph
+    try:
+        gangu_graph = create_gangu_graph()
+        print("✅ GANGU Graph initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize GANGU: {e}")
+        raise
+    yield
 
 app = FastAPI(
     title="GANGU API",
     description="Grocery Assistant for Elderly Users - Voice-First Agentic AI",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS Configuration - Allow frontend to connect
@@ -78,20 +105,6 @@ class AgentStatusUpdate(BaseModel):
 # Initialize GANGU Graph
 gangu_graph = None
 
-def init_gangu():
-    """Initialize GANGU graph"""
-    global gangu_graph
-    try:
-        gangu_graph = create_gangu_graph()
-        print("✅ GANGU Graph initialized successfully")
-    except Exception as e:
-        print(f"❌ Failed to initialize GANGU: {e}")
-        raise
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize GANGU on startup"""
-    init_gangu()
 
 # ============================================================================
 # WEBSOCKET ENDPOINT - Real-time Agent Updates
@@ -263,28 +276,25 @@ async def process_chat(request: ChatRequest):
             )
         )
         
-        # Stream through the graph with proper exception handling
-        result_state = None
+        # Stream through the graph as a CHILD TASK so /api/cancel can
+        # interrupt it instantly via asyncio.Task.cancel(). Without this, the
+        # cancel flag is only checked between agent boundaries — and slow
+        # agents (e.g. Zepto MCP retries) keep the user waiting up to 15s.
+        result_state: Optional[Dict[str, Any]] = None
+        merged_state: Dict[str, Any] = {}
         cancelled = False
-        
-        try:
+
+        async def _run_stream():
+            nonlocal result_state
             async for event in gangu_graph.astream(initial_state, config):
-                # Check for cancellation before processing each event
+                if isinstance(event, dict):
+                    for node_state in event.values():
+                        if isinstance(node_state, dict):
+                            merged_state.update(node_state)
+                # Cooperative cancel — kept for safety in case .cancel() isn't called.
                 if active_sessions.get(session_id, False):
-                    print(f"⏹️ Session {session_id} cancelled by user")
-                    await broadcast_agent_status(
-                        session_id,
-                        AgentStatusUpdate(
-                            step="cancelled",
-                            status="error",
-                            message="Operation cancelled by user",
-                            data={}
-                        )
-                    )
-                    # Cleanup
-                    active_sessions.pop(session_id, None)
-                    cancelled = True
-                    break  # Exit the loop immediately
+                    print(f"⏹️ Session {session_id} cancelled (cooperative)")
+                    raise asyncio.CancelledError()
                 
                 # Broadcast each agent's progress based on node names
                 # LangGraph returns events with node names as keys
@@ -441,73 +451,90 @@ async def process_chat(request: ChatRequest):
                     )
                 
                 result_state = event
-        
+        # END of _run_stream
+
+        pipeline_task = asyncio.create_task(_run_stream())
+        session_tasks[session_id] = pipeline_task
+
+        try:
+            await pipeline_task
         except (GeneratorExit, asyncio.CancelledError, StopAsyncIteration) as e:
-            # Handle graceful shutdown of async generator
             print(f"⏹️ Graph stream interrupted for session {session_id}: {type(e).__name__}")
             cancelled = True
-            await broadcast_agent_status(
-                session_id,
-                AgentStatusUpdate(
-                    step="cancelled",
-                    status="error",
-                    message="Processing stopped",
-                    data={}
+            try:
+                await broadcast_agent_status(
+                    session_id,
+                    AgentStatusUpdate(
+                        step="cancelled",
+                        status="error",
+                        message="Processing stopped",
+                        data={}
+                    )
                 )
-            )
-        
-        # If cancelled, return cancellation response
-        if cancelled:
-            # Cleanup session
+            except Exception:
+                pass
+        finally:
+            session_tasks.pop(session_id, None)
             active_sessions.pop(session_id, None)
+
+        if cancelled:
             return {
                 "success": False,
                 "session_id": session_id,
                 "message": "Operation cancelled by user",
-                "cancelled": True
+                "cancelled": True,
             }
         
-        # After graph completes, ensure purchase and notification are marked complete
-        # (These agents run but graph may complete before we catch their events)
-        if result_state:
-            # Mark purchase complete if decision was made
-            if result_state.get("decision"):
-                await broadcast_agent_status(
-                    session_id,
-                    AgentStatusUpdate(
-                        step="purchase",
-                        status="complete",
-                        message="Order prepared (awaiting confirmation)",
-                        data={}
-                    )
+        # After graph completes, ensure purchase and notification are marked complete.
+        if merged_state.get("decision_results") or merged_state.get("selected_option"):
+            await broadcast_agent_status(
+                session_id,
+                AgentStatusUpdate(
+                    step="purchase",
+                    status="complete",
+                    message="Order prepared (awaiting confirmation)",
+                    data={}
                 )
-                
-                # Mark notification complete
-                await broadcast_agent_status(
-                    session_id,
-                    AgentStatusUpdate(
-                        step="notification",
-                        status="complete",
-                        message="Ready to confirm",
-                        data={}
-                    )
+            )
+            await broadcast_agent_status(
+                session_id,
+                AgentStatusUpdate(
+                    step="notification",
+                    status="complete",
+                    message="Ready to confirm",
+                    data={}
                 )
-        
-        # Extract final state
-        final_decision = result_state.get("decision", {})
-        comparison = result_state.get("comparison", {})
-        
+            )
+
+        # Extract final state from the accumulator (event payloads only carry the
+        # latest node's output, so we must merge across the full stream).
+        intent_block = merged_state.get("intent_data", {})
+        comparison_block = merged_state.get("comparison_results", {})
+        ranked_products = merged_state.get("ranked_products", [])
+        decision_block = merged_state.get("decision_results", {})
+        selected_option = merged_state.get("selected_option")
+        ai_response = merged_state.get("ai_response", "")
+        decision_type = merged_state.get("decision_type", "unknown")
+
         # Clean up session from active sessions
         if session_id in active_sessions:
             del active_sessions[session_id]
-        
+
         return {
             "success": True,
             "session_id": session_id,
-            "intent": result_state.get("intent", {}),
-            "comparison": comparison,
-            "recommendation": final_decision,
-            "requires_confirmation": True
+            "intent": intent_block,
+            "comparison": {
+                **comparison_block,
+                "ranked_products": ranked_products,
+            },
+            "recommendation": {
+                **decision_block,
+                "selected_option": selected_option,
+                "decision_type": decision_type,
+            },
+            "ai_response": ai_response,
+            "requires_confirmation": decision_type in ("confirm_with_user", "auto_buy"),
         }
         
     except Exception as e:
@@ -607,15 +634,24 @@ async def get_order_history():
 @app.post("/api/cancel")
 async def cancel_processing(request: CancelRequest):
     """
-    Cancel ongoing agent processing
+    Cancel ongoing agent processing.
+    Calls .cancel() on the running pipeline task so the long-running agents
+    (Zepto MCP, Amazon scrape, etc.) are interrupted instantly rather than
+    waiting up to 15s for the next agent boundary.
     """
     try:
         session_id = request.session_id
-        
-        # Mark session as cancelled
-        active_sessions[session_id] = True  # True = cancelled
-        
-        # Broadcast cancellation
+
+        # Cooperative flag (defence-in-depth in case the task hook is missed)
+        active_sessions[session_id] = True
+
+        # Hard-cancel the running pipeline task
+        task = session_tasks.get(session_id)
+        if task is not None and not task.done():
+            task.cancel()
+            print(f"⏹️ Cancelled pipeline task for session {session_id}")
+
+        # Broadcast cancellation immediately so the WS client updates UI
         await broadcast_agent_status(
             session_id,
             AgentStatusUpdate(
@@ -625,7 +661,7 @@ async def cancel_processing(request: CancelRequest):
                 data={"cancelled": True}
             )
         )
-        
+
         return {
             "success": True,
             "session_id": session_id,

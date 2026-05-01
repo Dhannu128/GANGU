@@ -26,20 +26,12 @@ load_dotenv(dotenv_path=env_path)
 # Also try loading from current working directory
 load_dotenv()
 
-# Use the new google-genai package
-from google import genai
+# TokenRouter (OpenAI-compatible) → Claude Haiku 4.5 — see agents/llm.py
+from agents import llm as genai
 
 # ---------------- API CONFIGURATION ---------------- #
 
-# Use dedicated API key for Decision Agent (high usage)
-api_key = os.environ.get('GEMINI_API_KEY_DECISION') or os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
-if not api_key:
-    raise ValueError("❌ GEMINI_API_KEY environment variable not set")
-
-print(f"🔑 Decision Agent using API key: ...{api_key[-8:]}")
-
-# Initialize the new GenAI client
-client = genai.Client(api_key=api_key)
+client = genai.Client()
 
 # ---------------- SYSTEM PROMPT ---------------- #
 
@@ -934,7 +926,7 @@ Now process the comparison results and make the final decision.
 
 # ---------------- MODEL INITIALIZATION ---------------- #
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = genai.get_model_name()
 
 # Chat history to maintain context
 chat_history = [
@@ -1176,11 +1168,12 @@ def make_decision(comparison_results: Dict[str, Any]) -> Dict[str, Any]:
                     time.sleep(delay)
                     retry_delay = int(retry_delay * 1.5)
                 else:
-                    print(f"\n❌ DECISION AGENT: Max retries reached")
-                    return report_agent_failure("decision_agent", "Rate limit exhausted after retries", True)
+                    print(f"\n❌ DECISION AGENT: Max retries reached, using deterministic fallback")
+                    return create_fallback_decision(comparison_results)
             else:
                 print(f"\n❌ DECISION AGENT: API error - {error_str[:100]}")
-                return report_agent_failure("decision_agent", error_str, False)
+                print("   ↳ Falling back to deterministic decision so the pipeline can complete.")
+                return create_fallback_decision(comparison_results)
     
     if response is None:
         return report_agent_failure("decision_agent", "No response from API after retries", True)

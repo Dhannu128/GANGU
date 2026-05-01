@@ -1,13 +1,61 @@
 'use client'
 
-import { useGANGUStore, type Language } from '@/lib/store'
-import { Settings as SettingsIcon, Globe2, MapPin, Wallet, Volume2, Eye, ShieldCheck } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useGANGUStore, type Language, type Settings } from '@/lib/store'
+import {
+  Settings as SettingsIcon,
+  Globe2,
+  MapPin,
+  Wallet,
+  Volume2,
+  Eye,
+  ShieldCheck,
+  Save,
+  RotateCcw,
+  Check,
+} from 'lucide-react'
 
 export default function SettingsPage() {
-  const { settings, updateSettings, user, updateUser } = useGANGUStore()
+  const { settings, updateSettings, user, updateUser, pushToast } = useGANGUStore()
+
+  const [draft, setDraft] = useState<Settings>(settings)
+  const [draftName, setDraftName] = useState(user?.name ?? '')
+
+  useEffect(() => {
+    setDraft(settings)
+  }, [settings])
+
+  useEffect(() => {
+    setDraftName(user?.name ?? '')
+  }, [user?.name])
+
+  const isDirty = useMemo(() => {
+    return (
+      JSON.stringify(draft) !== JSON.stringify(settings) ||
+      draftName !== (user?.name ?? '')
+    )
+  }, [draft, settings, draftName, user?.name])
+
+  const patch = (p: Partial<Settings>) => setDraft((d) => ({ ...d, ...p }))
+
+  const handleSave = () => {
+    updateSettings(draft)
+    updateUser({ language: draft.language, address: draft.address, name: draftName })
+    pushToast({
+      variant: 'success',
+      title: 'Settings saved',
+      description: 'Your preferences are updated everywhere.',
+    })
+  }
+
+  const handleDiscard = () => {
+    setDraft(settings)
+    setDraftName(user?.name ?? '')
+    pushToast({ variant: 'info', title: 'Changes discarded' })
+  }
 
   return (
-    <main className="min-h-screen pb-12">
+    <main className="min-h-screen pb-32">
       <div className="max-w-3xl mx-auto px-5 md:px-8 pt-8 md:pt-10">
         <header className="mb-8">
           <span className="pill-slate mb-3 inline-flex">
@@ -19,7 +67,6 @@ export default function SettingsPage() {
         </header>
 
         <div className="space-y-5">
-          {/* Language */}
           <Section icon={Globe2} title="Preferred language" subtitle="The greeting and confirmations adapt.">
             <div className="grid grid-cols-3 gap-2">
               {(
@@ -29,38 +76,25 @@ export default function SettingsPage() {
                   { v: 'hinglish', label: 'Hinglish' },
                 ] as { v: Language; label: string }[]
               ).map((opt) => (
-                <button
+                <Choice
                   key={opt.v}
-                  onClick={() => {
-                    updateSettings({ language: opt.v })
-                    updateUser({ language: opt.v })
-                  }}
-                  className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-                    settings.language === opt.v
-                      ? 'bg-amber-500/15 border-amber-500/50 text-amber-200'
-                      : 'bg-white/[0.04] border-white/10 text-slate-300 hover:border-white/20'
-                  }`}
-                >
-                  {opt.label}
-                </button>
+                  label={opt.label}
+                  active={draft.language === opt.v}
+                  onClick={() => patch({ language: opt.v })}
+                />
               ))}
             </div>
           </Section>
 
-          {/* Address */}
           <Section icon={MapPin} title="Default delivery address" subtitle="Where your orders should arrive.">
             <input
               type="text"
-              value={settings.address}
-              onChange={(e) => {
-                updateSettings({ address: e.target.value })
-                updateUser({ address: e.target.value })
-              }}
+              value={draft.address}
+              onChange={(e) => patch({ address: e.target.value })}
               className="input-base"
             />
           </Section>
 
-          {/* Payment */}
           <Section icon={Wallet} title="Payment method" subtitle="Default for confirmed orders.">
             <div className="grid grid-cols-3 gap-2">
               {(
@@ -70,57 +104,44 @@ export default function SettingsPage() {
                   { v: 'card', label: 'Card' },
                 ] as const
               ).map((opt) => (
-                <button
+                <Choice
                   key={opt.v}
-                  onClick={() => updateSettings({ paymentMethod: opt.v })}
-                  className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-                    settings.paymentMethod === opt.v
-                      ? 'bg-amber-500/15 border-amber-500/50 text-amber-200'
-                      : 'bg-white/[0.04] border-white/10 text-slate-300 hover:border-white/20'
-                  }`}
-                >
-                  {opt.label}
-                </button>
+                  label={opt.label}
+                  active={draft.paymentMethod === opt.v}
+                  onClick={() => patch({ paymentMethod: opt.v })}
+                />
               ))}
             </div>
           </Section>
 
-          {/* Voice speed */}
           <Section icon={Volume2} title="Voice speed" subtitle="How fast GANGU should reply when speaking.">
             <div className="grid grid-cols-3 gap-2">
               {(['slow', 'normal', 'fast'] as const).map((v) => (
-                <button
+                <Choice
                   key={v}
-                  onClick={() => updateSettings({ voiceSpeed: v })}
-                  className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all capitalize ${
-                    settings.voiceSpeed === v
-                      ? 'bg-amber-500/15 border-amber-500/50 text-amber-200'
-                      : 'bg-white/[0.04] border-white/10 text-slate-300 hover:border-white/20'
-                  }`}
-                >
-                  {v}
-                </button>
+                  label={v.charAt(0).toUpperCase() + v.slice(1)}
+                  active={draft.voiceSpeed === v}
+                  onClick={() => patch({ voiceSpeed: v })}
+                />
               ))}
             </div>
           </Section>
 
-          {/* Accessibility */}
           <Section icon={Eye} title="Accessibility" subtitle="Make text and contrast easier on the eyes.">
             <div className="space-y-3">
               <Toggle
                 label="Larger text"
-                value={settings.largerText}
-                onChange={(v) => updateSettings({ largerText: v })}
+                value={draft.largerText}
+                onChange={(v) => patch({ largerText: v })}
               />
               <Toggle
                 label="Higher contrast"
-                value={settings.higherContrast}
-                onChange={(v) => updateSettings({ higherContrast: v })}
+                value={draft.higherContrast}
+                onChange={(v) => patch({ higherContrast: v })}
               />
             </div>
           </Section>
 
-          {/* Privacy */}
           <Section icon={ShieldCheck} title="Data & privacy" subtitle="Your voice is transcribed once and discarded — never stored.">
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary text-sm">Download my data</button>
@@ -129,15 +150,53 @@ export default function SettingsPage() {
             </div>
           </Section>
 
-          {/* Account */}
           {user && (
             <Section icon={SettingsIcon} title="Account" subtitle="Your basic details.">
               <div className="space-y-3">
-                <Field label="Name" value={user.name} />
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-1.5">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                    className="input-base"
+                  />
+                </div>
                 <Field label="Phone" value={user.phone} />
               </div>
             </Section>
           )}
+        </div>
+      </div>
+
+      {/* Sticky save bar */}
+      <div
+        className={`fixed bottom-4 inset-x-0 z-40 px-4 transition-all duration-300 ${
+          isDirty ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'
+        }`}
+      >
+        <div className="max-w-3xl mx-auto glass-strong rounded-2xl shadow-card border border-amber-500/30 px-5 py-3.5 flex items-center justify-between gap-4 animate-rise">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+              <Check className="w-4 h-4 text-amber-300" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white">Unsaved changes</p>
+              <p className="text-xs text-slate-400 truncate">Tap save to apply across your account.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={handleDiscard} className="btn-secondary text-sm">
+              <RotateCcw className="w-4 h-4" />
+              Discard
+            </button>
+            <button onClick={handleSave} className="btn-primary text-sm">
+              <Save className="w-4 h-4" />
+              Save changes
+            </button>
+          </div>
         </div>
       </div>
     </main>
@@ -168,6 +227,21 @@ function Section({
       </div>
       {children}
     </article>
+  )
+}
+
+function Choice({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+        active
+          ? 'bg-amber-500/15 border-amber-500/50 text-amber-200'
+          : 'bg-white/[0.04] border-white/10 text-slate-300 hover:border-white/20'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
 

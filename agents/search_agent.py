@@ -29,8 +29,8 @@ load_dotenv(dotenv_path=env_path)
 # Also try loading from current working directory
 load_dotenv()
 
-# Use the new google-genai package
-from google import genai
+# TokenRouter (OpenAI-compatible) → Claude Haiku 4.5 — see agents/llm.py
+from agents import llm as genai
 
 # Try to import MCP clients
 try:
@@ -60,12 +60,7 @@ except ImportError as e:
 
 # ---------------- API CONFIGURATION ---------------- #
 
-api_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
-if not api_key:
-    raise ValueError("❌ GEMINI_API_KEY or GOOGLE_API_KEY environment variable not set")
-
-# Initialize the new GenAI client
-client = genai.Client(api_key=api_key)
+client = genai.Client()
 
 # ---------------- SYSTEM PROMPT ---------------- #
 
@@ -385,7 +380,7 @@ Now process the search request and return raw, normalized data.
 
 # ---------------- MODEL INITIALIZATION ---------------- #
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = genai.get_model_name()
 
 # Chat history to maintain context
 chat_history = [

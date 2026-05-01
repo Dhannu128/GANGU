@@ -22,20 +22,12 @@ load_dotenv(dotenv_path=env_path)
 # Also try loading from current working directory
 load_dotenv()
 
-# Use the new google-genai package
-from google import genai
+# TokenRouter (OpenAI-compatible) → Claude Haiku 4.5 — see agents/llm.py
+from agents import llm as genai
 
 # ---------------- API CONFIGURATION ---------------- #
 
-# Use dedicated API key for Intent Extraction Agent (high usage)
-api_key = os.environ.get('GEMINI_API_KEY_INTENT') or os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
-if not api_key:
-    raise ValueError("❌ GEMINI_API_KEY environment variable not set")
-
-print(f"🔑 Intent Agent using API key: ...{api_key[-8:]}")
-
-# Initialize the new GenAI client
-client = genai.Client(api_key=api_key)
+client = genai.Client()
 
 # ---------------- SYSTEM PROMPT ---------------- #
 
@@ -199,8 +191,7 @@ Now process the user's input and extract intent.
 
 # ---------------- MODEL INITIALIZATION ---------------- #
 
-# Model name for the new API
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = genai.get_model_name()
 
 # Chat history to maintain context
 chat_history = [
@@ -226,15 +217,32 @@ def simple_fallback_parser(user_input: str) -> dict:
     """Simple rule-based parser for common grocery items"""
     text_lower = user_input.lower()
     
-    # Common items
+    # Common items (longest variants first so multi-word matches win)
     items = {
-        "rice": ["rice", "chawal"], "dal": ["dal"], "atta": ["atta", "flour"],
-        "besan": ["besan", "gram flour"], "milk": ["milk", "doodh"],
-        "bread": ["bread"], "oil": ["oil", "tel"], "sugar": ["sugar", "chini"],
-        "salt": ["salt", "namak"], "onion": ["onion", "pyaz"],
-        "potato": ["potato", "aloo"], "tomato": ["tomato", "tamatar"],
-        "eggs": ["egg", "anda"], "paneer": ["paneer"], "curd": ["curd", "dahi"],
-        "ghee": ["ghee"], "butter": ["butter"], "tea": ["tea", "chai"]
+        "rice": ["basmati rice", "rice", "chawal"],
+        "dal": ["toor dal", "moong dal", "masoor dal", "dal"],
+        "atta": ["atta", "wheat flour", "flour"],
+        "besan": ["besan", "gram flour"],
+        "chana": ["white chana", "kala chana", "chana", "chane", "chickpeas", "chickpea"],
+        "rajma": ["rajma", "kidney beans"],
+        "milk": ["milk", "doodh"],
+        "bread": ["bread"],
+        "oil": ["oil", "tel", "refined oil", "mustard oil", "sarson tel"],
+        "sugar": ["sugar", "chini"],
+        "salt": ["salt", "namak"],
+        "onion": ["onion", "pyaz", "pyaaz"],
+        "potato": ["potato", "aloo"],
+        "tomato": ["tomato", "tamatar"],
+        "eggs": ["eggs", "egg", "anda", "ande"],
+        "paneer": ["paneer"],
+        "curd": ["curd", "dahi"],
+        "ghee": ["ghee"],
+        "butter": ["butter", "makhan"],
+        "tea": ["tea", "chai", "chaay"],
+        "biscuit": ["biscuit", "biscuits"],
+        "maggi": ["maggi", "noodles"],
+        "soap": ["soap", "saabun"],
+        "shampoo": ["shampoo"],
     }
     
     detected_item = None
@@ -246,7 +254,16 @@ def simple_fallback_parser(user_input: str) -> dict:
     if not detected_item:
         return None
     
-    buy_keywords = ["khatam", "order", "buy", "le ao", "lao", "chahiye", "mangao", "want", "need", "get", "from zepto", "through zepto"]
+    buy_keywords = [
+        "khatam", "khatm",
+        "order", "buy", "purchase",
+        "le aao", "le ao", "le aa", "lao", "laana", "lana",
+        "mangwao", "mangao", "mangwa do", "manga do",
+        "chahiye", "chahye", "chahta", "chahti",
+        "want", "need", "get",
+        "bhej do", "bhejo",
+        "from zepto", "through zepto", "from blinkit", "from amazon",
+    ]
     has_buy_intent = any(kw in text_lower for kw in buy_keywords)
     
     urgent_keywords = ["urgent", "jaldi", "abhi", "turant"]

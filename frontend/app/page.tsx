@@ -7,6 +7,10 @@ import DemoStrip from '@/components/landing/DemoStrip'
 import Testimonials from '@/components/landing/Testimonials'
 import Pricing from '@/components/landing/Pricing'
 import FAQ from '@/components/landing/FAQ'
+import TrustStrip from '@/components/landing/TrustStrip'
+import BuiltWithBar from '@/components/landing/BuiltWithBar'
+import ComparisonMatrix from '@/components/landing/ComparisonMatrix'
+import MobileNav from '@/components/landing/MobileNav'
 import {
   Mic,
   Sparkles,
@@ -90,23 +94,25 @@ export default function Home() {
               {connected ? 'Live' : 'Offline'}
             </span>
             {auth.isAuthenticated ? (
-              <Link href="/app" className="btn-primary text-sm">
+              <Link href="/app" className="btn-primary text-sm hidden md:inline-flex">
                 Open app
                 <ArrowRight className="w-4 h-4" />
               </Link>
             ) : (
               <>
-                <Link href="/signin" className="btn-ghost text-sm">Sign in</Link>
-                <Link href="/signup" className="btn-primary text-sm">Get started</Link>
+                <Link href="/signin" className="btn-ghost text-sm hidden md:inline-flex">Sign in</Link>
+                <Link href="/signup" className="btn-primary text-sm hidden md:inline-flex">Get started</Link>
               </>
             )}
+            <MobileNav isAuthenticated={auth.isAuthenticated} />
           </div>
         </div>
       </nav>
 
       {/* HERO */}
       <section className="relative max-w-7xl mx-auto px-6 pt-20 md:pt-24 pb-12">
-        <div className="text-center max-w-4xl mx-auto animate-fade-in">
+        <div className="aurora-layer" aria-hidden="true" />
+        <div className="relative text-center max-w-4xl mx-auto animate-fade-in">
           <span className="pill-amber mb-7 mx-auto inline-flex">
             <Sparkles className="w-3.5 h-3.5" />
             India's first voice-first grocery assistant
@@ -123,7 +129,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href={auth.isAuthenticated ? '/app' : '/signup'} className="btn-primary text-base px-7 py-3.5">
+            <Link href={auth.isAuthenticated ? '/app' : '/signup'} className="btn-primary pulse-glow text-base px-7 py-3.5">
               <Mic className="w-4 h-4" />
               {auth.isAuthenticated ? 'Open app' : 'Get started free'}
             </Link>
@@ -149,6 +155,9 @@ export default function Home() {
         </div>
       </section>
 
+      {/* TRUST STRIP */}
+      <TrustStrip />
+
       {/* LIVE DEMO STRIP */}
       <div id="demo">
         <DemoStrip />
@@ -172,6 +181,9 @@ export default function Home() {
           <div className="pointer-events-none absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-ink-950 to-transparent" />
         </div>
       </section>
+
+      {/* BUILT WITH */}
+      <BuiltWithBar />
 
       {/* HOW IT WORKS */}
       <section id="how-it-works" className="relative max-w-7xl mx-auto px-6 py-24 scroll-mt-20">
@@ -232,6 +244,9 @@ export default function Home() {
           })}
         </div>
       </section>
+
+      {/* COMPARISON */}
+      <ComparisonMatrix />
 
       {/* TESTIMONIALS */}
       <Testimonials />

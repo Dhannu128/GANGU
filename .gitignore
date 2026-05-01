@@ -83,3 +83,5 @@ data/db/
 mongo-data/
 
 .claude/
+.langsmith_*.json
+.last_response.json

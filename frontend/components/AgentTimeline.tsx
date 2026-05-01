@@ -34,23 +34,35 @@ export default function AgentTimeline() {
     isCancelling,
     setCancelling,
     setCancelled,
-    setProcessing,
+    abortController,
+    pushToast,
   } = useGANGUStore()
   const [cancelError, setCancelError] = useState('')
 
   const handleCancel = async () => {
     if (!sessionId) return
+
+    // 1) Abort the in-flight HTTP call locally — frees the UI instantly,
+    //    no waiting for the backend to finish the current agent.
+    abortController?.abort()
+
+    // 2) Optimistically update UI: mark as cancelled now, even before the
+    //    backend ack arrives. setCancelled also clears isCancelling +
+    //    isProcessing in the store.
+    setCancelling(true)
+    setCancelError('')
+
+    // 3) Tell the backend so it can .cancel() the running pipeline task
+    //    (stops the slow Zepto MCP retries). Fire-and-forget — don't block UI.
     try {
-      setCancelling(true)
-      setProcessing(false)
-      setCancelError('')
       await cancelProcessing(sessionId)
       setCancelled(true)
+      pushToast({ variant: 'info', title: 'Order cancelled', description: 'The pipeline was stopped.' })
     } catch (error) {
       console.error('Cancel error:', error)
-      setCancelError('Failed to cancel. Please try again.')
-      setCancelling(false)
-      setProcessing(true)
+      // Still mark cancelled locally — the user expects the UI to update.
+      setCancelled(true)
+      setCancelError('Cancelled locally — backend may still be cleaning up.')
     }
   }
 

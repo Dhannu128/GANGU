@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import '@/styles/globals.css'
+import ToastViewport from '@/components/Toast'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${jakarta.variable}`}>
       <body className={inter.className}>
         <div className="relative z-10">{children}</div>
+        <ToastViewport />
       </body>
     </html>
   )

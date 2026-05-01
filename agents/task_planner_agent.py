@@ -23,20 +23,12 @@ load_dotenv(dotenv_path=env_path)
 # Also try loading from current working directory
 load_dotenv()
 
-# Use the new google-genai package
-from google import genai
+# TokenRouter (OpenAI-compatible) → Claude Haiku 4.5 — see agents/llm.py
+from agents import llm as genai
 
 # ---------------- API CONFIGURATION ---------------- #
 
-# Use dedicated API key for Task Planner Agent
-api_key = os.environ.get('GEMINI_API_KEY_PLANNER') or os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
-if not api_key:
-    raise ValueError("❌ GEMINI_API_KEY environment variable not set")
-
-print(f"🔑 Task Planner using API key: ...{api_key[-8:]}")
-
-# Initialize the new GenAI client
-client = genai.Client(api_key=api_key)
+client = genai.Client()
 
 # ---------------- SYSTEM PROMPT ---------------- #
 
@@ -655,8 +647,7 @@ Now process the intent input and create an action plan.
 
 # ---------------- MODEL INITIALIZATION ---------------- #
 
-# Model name for the new API
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = genai.get_model_name()
 
 # Chat history to maintain context
 chat_history = [
