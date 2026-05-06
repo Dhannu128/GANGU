@@ -17,8 +17,10 @@ ZEPTO_PRODUCT_CATALOG = {
     "tomato": "https://www.zepto.com/pn/tomato/pvid/d34f8cf4-5876-40ef-8ea5-cd2a31b4db39",
     "dal": "https://www.zepto.com/pn/popular-essentials-toor-dal/pvid/870056e6-aad4-43e6-8e38-e757dc2b028c",
     "rice": "https://www.zepto.com/pn/steamed-rice/pvid/6b744fa4-f7e0-4cb9-8b3e-3befcf1ecb2d",
-    "milk": "https://www.zepto.com/pn/plain-curd/pvid/a1a7b157-d40b-41c0-92be-e119a8c77e9a",
-    "bread": "https://www.zepto.com/pn/garlic-bread-with-cheese-dip/pvid/5b265566-61a3-4660-9e76-5e40643fe81f",
+    "milk": "https://www.zepto.com/pn/amul-taaza-toned-fresh-milk-pouch/pvid/faabc8db-cb19-4021-9a0f-77e1011baa4c",
+    "doodh": "https://www.zepto.com/pn/amul-taaza-toned-fresh-milk-pouch/pvid/faabc8db-cb19-4021-9a0f-77e1011baa4c",
+    "amul milk": "https://www.zepto.com/pn/amul-taaza-toned-fresh-milk-pouch/pvid/faabc8db-cb19-4021-9a0f-77e1011baa4c",
+    "bread": "https://www.zepto.com/pn/brano-asli-makhan-malai-bread/pvid/dbcf5163-4f13-4f7e-85d0-33563cd03a2b",
     "paneer": "https://www.zepto.com/pn/paneer-tandoori-tikka/pvid/7eb6a978-fd60-4288-a37e-7627312cd8ea",
     "chai": "https://www.zepto.com/pn/adrak-chai/pvid/959a5253-e580-4f44-8236-07ac7ba96bbf",
     "tea": "https://www.zepto.com/pn/adrak-chai/pvid/959a5253-e580-4f44-8236-07ac7ba96bbf",  # Same as chai
@@ -50,6 +52,40 @@ ZEPTO_PRODUCT_CATALOG = {
     "cucumber": "https://www.zepto.com/pn/ash-gourd/pvid/aa891942-3ce5-437e-bb11-0120ae085874",
     "carrot": "https://www.zepto.com/pn/beetroot-500-g-combo/pvid/20b3e088-7254-4355-8955-e25ebd552f9e",
     "capsicum": "https://www.zepto.com/pn/ash-gourd/pvid/aa891942-3ce5-437e-bb11-0120ae085874",
+    "chocolate": "https://www.zepto.com/pn/cadbury-bournville-rich-cocoa-50-dark-chocolate-bar/pvid/db6c4a25-24fe-49e9-8828-9bea53557aa2",
+    # Snacks / chips
+    "kurkure": "https://www.zepto.com/pn/kurkure-masala-munch-combo/pvid/bf401859-bcff-42ce-aa90-089679e05d55",
+    "masala munch": "https://www.zepto.com/pn/kurkure-masala-munch-combo/pvid/bf401859-bcff-42ce-aa90-089679e05d55",
+    "balaji": "https://www.zepto.com/pn/balaji-tomato-wafers/pvid/91fae44c-865d-4bc8-8ac1-bda71ac51292",
+    "wafers": "https://www.zepto.com/pn/balaji-tomato-wafers/pvid/91fae44c-865d-4bc8-8ac1-bda71ac51292",
+    "tomato wafers": "https://www.zepto.com/pn/balaji-tomato-wafers/pvid/91fae44c-865d-4bc8-8ac1-bda71ac51292",
+    "chips": "https://www.zepto.com/pn/balaji-tomato-wafers/pvid/91fae44c-865d-4bc8-8ac1-bda71ac51292",
+    # Ice cream
+    "ice-cream": "https://www.zepto.com/pn/kwality-walls-vanilla-ice-cream-tub/pvid/02e2974d-901a-42fb-a907-a625aca61029",
+    "ice cream": "https://www.zepto.com/pn/kwality-walls-vanilla-ice-cream-tub/pvid/02e2974d-901a-42fb-a907-a625aca61029",
+    "icecream": "https://www.zepto.com/pn/kwality-walls-vanilla-ice-cream-tub/pvid/02e2974d-901a-42fb-a907-a625aca61029",
+    # Biscuits / cookies
+    "biscuit": "https://www.zepto.com/pn/original-choco-fills-by-sunfeast-dark-fantasy-perfect-snack/pvid/b9606e95-79a6-4814-827d-104b680ca81f",
+    "biscuits": "https://www.zepto.com/pn/original-choco-fills-by-sunfeast-dark-fantasy-perfect-snack/pvid/b9606e95-79a6-4814-827d-104b680ca81f",
+    "cookies": "https://www.zepto.com/pn/original-choco-fills-by-sunfeast-dark-fantasy-perfect-snack/pvid/b9606e95-79a6-4814-827d-104b680ca81f",
+    "dark fantasy": "https://www.zepto.com/pn/original-choco-fills-by-sunfeast-dark-fantasy-perfect-snack/pvid/b9606e95-79a6-4814-827d-104b680ca81f",
+    # Stationery
+    "pen": "https://www.zepto.com/pn/reynolds-vista-retractable-ball-pen-set-5-blue-pens/pvid/39116aa7-1eb6-42fe-9eb8-b45295f0288f",
+    "ball pen": "https://www.zepto.com/pn/reynolds-vista-retractable-ball-pen-set-5-blue-pens/pvid/39116aa7-1eb6-42fe-9eb8-b45295f0288f",
+    "copy": "https://www.zepto.com/pn/classmate-single-line-spiral-notebook-160-pages-27-x-20-cm-assorted-designs/pvid/83161c72-c063-4dbe-a69d-107abc5b6f25",
+    "notebook": "https://www.zepto.com/pn/classmate-single-line-spiral-notebook-160-pages-27-x-20-cm-assorted-designs/pvid/83161c72-c063-4dbe-a69d-107abc5b6f25",
+    "spiral notebook": "https://www.zepto.com/pn/classmate-single-line-spiral-notebook-160-pages-27-x-20-cm-assorted-designs/pvid/83161c72-c063-4dbe-a69d-107abc5b6f25",
+    "classmate": "https://www.zepto.com/pn/classmate-single-line-spiral-notebook-160-pages-27-x-20-cm-assorted-designs/pvid/83161c72-c063-4dbe-a69d-107abc5b6f25",
+    # Soft drinks
+    "soft drinks": "https://www.zepto.com/pn/sprite-lemon-soft-drink-carbonated-beverage/pvid/d3159067-a3e8-44aa-a215-ff937c6da7da",
+    "soft drink": "https://www.zepto.com/pn/sprite-lemon-soft-drink-carbonated-beverage/pvid/d3159067-a3e8-44aa-a215-ff937c6da7da",
+    "cold drink": "https://www.zepto.com/pn/sprite-lemon-soft-drink-carbonated-beverage/pvid/d3159067-a3e8-44aa-a215-ff937c6da7da",
+    "cold drinks": "https://www.zepto.com/pn/sprite-lemon-soft-drink-carbonated-beverage/pvid/d3159067-a3e8-44aa-a215-ff937c6da7da",
+    "sprite": "https://www.zepto.com/pn/sprite-lemon-soft-drink-carbonated-beverage/pvid/d3159067-a3e8-44aa-a215-ff937c6da7da",
+    # Watermelon
+    "water melon": "https://www.zepto.com/pn/watermelon-saraswati/pvid/7bbe801b-d489-49dd-9368-ab4e039eb3a9",
+    "watermelon": "https://www.zepto.com/pn/watermelon-saraswati/pvid/7bbe801b-d489-49dd-9368-ab4e039eb3a9",
+    "tarbooj": "https://www.zepto.com/pn/watermelon-saraswati/pvid/7bbe801b-d489-49dd-9368-ab4e039eb3a9",
 }
 
 
@@ -197,24 +233,22 @@ class ZeptoMCPClient:
             "results": results
         }
 
-    async def start_zepto_order(self, product_name: str) -> dict:
+    async def start_zepto_order(self, product_name: str, item_url: str | None = None) -> dict:
         """
-        Start a Zepto order using the MCP server tool
-        
-        Args:
-            product_name: Name of the product to order
-            
-        Returns:
-            dict with order result
+        Start a Zepto order using the MCP server tool.
+
+        If `item_url` is provided, the MCP server bypasses its built-in
+        cafe catalog and orders directly from that URL — required for
+        grocery items not in the cafe catalog (e.g. chocolate).
         """
         if not self.session:
             await self.connect()
-        
+
         try:
-            # Call the start_zepto_order tool on the server
-            result = await self.session.call_tool("start_zepto_order", {
-                "product_name": product_name
-            })
+            args: dict = {"product_name": product_name}
+            if item_url:
+                args["item_url"] = item_url
+            result = await self.session.call_tool("start_zepto_order", args)
             
             # Extract the result from MCP response
             if result.content and len(result.content) > 0:
