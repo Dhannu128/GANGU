@@ -53,14 +53,53 @@ export default function AppHome() {
       setProcessing(true)
       const result = await processUserInput(message, sessionId || undefined, controller.signal)
       if (result.success) {
-        setComparison(result.comparison)
-        setRecommendation(result.recommendation)
-        if (result.recommendation && result.recommendation.selected_index !== undefined) {
+        // Backend now returns `ranked_products` and `requires_confirmation`,
+        // not `products` / `recommended_index` / `selected_index`. Normalise
+        // the shape here so every downstream component reads the same fields.
+        // ranked_products from comparison_agent nests under product_identity
+        // and normalized_attributes; the UI expects flat fields. Flatten.
+        const rawProducts =
+          result.comparison?.ranked_products ||
+          result.comparison?.products ||
+          []
+        const products = rawProducts.map((p: any) => ({
+          ...p,
+          name:
+            p.name ||
+            p.product_identity?.canonical_name ||
+            p.product_identity?.original_name ||
+            'Unknown product',
+          brand: p.brand || p.product_identity?.brand,
+          platform: p.platform,
+          price: p.price ?? p.normalized_attributes?.price ?? 0,
+          delivery_time:
+            p.delivery_time || p.normalized_attributes?.delivery_time_label,
+          rating: p.rating ?? p.normalized_attributes?.rating,
+          stock_status:
+            p.stock_status ||
+            (p.normalized_attributes?.availability ? 'in_stock' : undefined),
+          image: p.image,
+          url: p.url,
+        }))
+        const recommendedIndex =
+          result.comparison?.recommended_index ??
+          result.recommendation?.selected_index ??
+          0
+        const normalizedComparison = {
+          ...result.comparison,
+          products,
+          recommended_index: recommendedIndex,
+        }
+        const normalizedRecommendation = {
+          ...result.recommendation,
+          selected_index: recommendedIndex,
+        }
+        setComparison(normalizedComparison)
+        setRecommendation(normalizedRecommendation)
+
+        if (result.requires_confirmation && products.length > 0) {
+          setSelectedProductIndex(recommendedIndex)
           setShowConfirmation(true)
-          setSelectedProductIndex(result.recommendation.selected_index)
-        } else if (result.comparison && result.comparison.recommended_index !== undefined) {
-          setShowConfirmation(true)
-          setSelectedProductIndex(result.comparison.recommended_index)
         }
       }
     } catch (error: any) {
