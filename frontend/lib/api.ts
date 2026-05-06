@@ -7,6 +7,11 @@ const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000,
+  headers: {
+    // ngrok-free serves a confirmation page on first hit unless this header
+    // is set. No-op when the backend isn't behind ngrok.
+    'ngrok-skip-browser-warning': 'true',
+  },
 })
 
 // === WebSocket ===
