@@ -8,78 +8,94 @@ interface VoiceInputProps {
   onTranscription: (text: string) => void
 }
 
+// Web Speech API runs entirely in the user's browser — no audio upload,
+// no API key, no backend round-trip. Chrome/Edge support hi-IN well, which
+// covers Hindi, English, and Hinglish mix. Firefox does not implement
+// SpeechRecognition; users on Firefox will see "voice not supported" and
+// can fall back to the text input.
 export default function VoiceInput({ onTranscription }: VoiceInputProps) {
   const { isListening, setListening, transcription, setTranscription, isProcessing } = useGANGUStore()
   const [isSupported, setIsSupported] = useState(false)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
+  const recognitionRef = useRef<any>(null)
+  const finalTextRef = useRef<string>('')
 
   useEffect(() => {
-    setIsSupported(typeof window !== 'undefined' && 'MediaRecorder' in window)
+    if (typeof window === 'undefined') return
+    const SR =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition
+    setIsSupported(!!SR)
   }, [])
 
-  const startListening = async () => {
-    if (!isSupported) {
-      alert('Voice input is not supported in your browser. Please use Chrome or Edge.')
+  const startListening = () => {
+    if (typeof window === 'undefined') return
+    const SR =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition
+    if (!SR) {
+      alert('Voice input is not supported in this browser. Please use Chrome or Edge.')
       return
     }
 
+    finalTextRef.current = ''
+    setTranscription('')
+
+    const recognition = new SR()
+    // hi-IN handles Hindi + Roman-script English / Hinglish on Chrome.
+    recognition.lang = 'hi-IN'
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.maxAlternatives = 1
+
+    recognition.onresult = (event: any) => {
+      let interim = ''
+      let final = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript
+        if (event.results[i].isFinal) final += t
+        else interim += t
+      }
+      if (final) {
+        finalTextRef.current = (finalTextRef.current + ' ' + final).trim()
+        setTranscription(finalTextRef.current)
+      } else if (interim) {
+        setTranscription((finalTextRef.current + ' ' + interim).trim())
+      }
+    }
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error)
+      if (event.error === 'no-speech') {
+        // benign — user tapped mic but didn't speak
+      } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        alert('Microphone permission denied. Allow it in browser settings.')
+      } else if (event.error === 'network') {
+        alert('Voice service network error. Check your internet and try again.')
+      }
+      setListening(false)
+    }
+
+    recognition.onend = () => {
+      setListening(false)
+      const finalText = finalTextRef.current.trim()
+      if (finalText) onTranscription(finalText)
+    }
+
+    recognitionRef.current = recognition
     try {
+      recognition.start()
       setListening(true)
-      audioChunksRef.current = []
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data)
-      }
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        await transcribeAudio(audioBlob)
-        stream.getTracks().forEach((t) => t.stop())
-      }
-
-      mediaRecorder.start()
-    } catch (error) {
-      console.error('Error starting recording:', error)
-      alert('Could not access microphone. Please check permissions.')
+    } catch (e) {
+      console.error('Failed to start recognition:', e)
       setListening(false)
     }
   }
 
   const stopListening = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
-    }
-    setListening(false)
-  }
-
-  const transcribeAudio = async (audioBlob: Blob) => {
     try {
-      const formData = new FormData()
-      formData.append('file', audioBlob, 'audio.webm')
-
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${apiBase}/api/voice/whisper`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await response.json()
-
-      if (data.success && data.text) {
-        setTranscription(data.text)
-        onTranscription(data.text)
-      } else {
-        alert('Could not transcribe audio. Please try again.')
-      }
-    } catch (error) {
-      console.error('Transcription error:', error)
-      alert('Error transcribing audio. Please try again.')
-    }
+      recognitionRef.current?.stop()
+    } catch {}
+    setListening(false)
   }
 
   const disabled = !isSupported || isProcessing
@@ -129,7 +145,7 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
         ) : (
           <div className="animate-fade-in">
             <p className="text-base font-semibold text-slate-200 mb-1.5">
-              {isSupported ? 'Tap to speak' : 'Voice not supported in this browser'}
+              {isSupported ? 'Tap to speak' : 'Voice not supported · use Chrome or Edge'}
             </p>
             <p className="text-sm text-slate-500 inline-flex items-center gap-1.5">
               <Languages className="w-3.5 h-3.5" />

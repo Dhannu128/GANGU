@@ -65,11 +65,60 @@ class EnhancedAmazonMCPClient:
             return []
     
     def extract_product_data(self, container) -> Dict[str, Any]:
-        """Extract real product data from Amazon search result container"""
+        """Extract real product data from Amazon search result container.
+
+        Amazon's product-card HTML changes shape across rebuilds, so we try
+        a ladder of selectors for each field. The title used to live in
+        `h2.a-size-mini`; today it's typically the h2's `aria-label` or its
+        inner span.
+        """
         try:
-            # Product title
-            title_elem = container.find('h2', class_='a-size-mini') or container.find('span', class_='a-size-base-plus')
-            title = title_elem.get_text(strip=True) if title_elem else "Unknown Product"
+            # Product title.
+            # Amazon search cards have TWO h2s per result on sponsored cards:
+            # the brand (often `a-size-mini`) and the full product title
+            # (often `a-size-base-plus` with `s-line-clamp-N`). Pick the most
+            # likely title-h2 first; otherwise pick the longest h2 text in the
+            # card (product titles are always longer than brand names).
+            title = None
+            # `a-size-base-plus` reliably marks the product-title h2; the
+            # brand-only h2 carries `a-size-mini` instead. Don't include
+            # `s-line-clamp` here — both h2s use it.
+            preferred = container.find(
+                'h2',
+                {'class': re.compile(r'(?:^|\s)(a-size-base-plus|a-size-medium)(?:\s|$)')},
+            )
+            h2_candidates = []
+            for h2 in container.find_all('h2'):
+                aria = h2.get('aria-label') or '' if hasattr(h2, 'get') else ''
+                text = h2.get_text(' ', strip=True)
+                cand = (aria.strip() if len(aria.strip()) >= len(text) else text)
+                if cand and len(cand) > 3:
+                    h2_candidates.append((h2, cand))
+            if preferred:
+                aria = preferred.get('aria-label') or ''
+                title = aria.strip() if aria.strip() else preferred.get_text(' ', strip=True)
+            if not title and h2_candidates:
+                # Fall back to the longest h2 text — product titles run longer
+                # than the brand label.
+                h2_candidates.sort(key=lambda x: len(x[1]), reverse=True)
+                title = h2_candidates[0][1]
+            if not title:
+                for sel in [
+                    ('span', {'class': re.compile(r'.*a-text-normal.*')}),
+                    ('span', {'class': re.compile(r'.*a-size-base-plus.*')}),
+                    ('a', {'class': re.compile(r'.*a-link-normal.*s-line-clamp.*')}),
+                ]:
+                    el = container.find(*sel)
+                    if el:
+                        text = el.get_text(' ', strip=True)
+                        if text and len(text) > 3:
+                            title = text
+                            break
+            if not title:
+                title = "Unknown Product"
+            # Amazon prefixes sponsored cards with "Sponsored Ad - "; strip it
+            # so brand extraction doesn't see "Sponsored" as the brand.
+            title = re.sub(r'^Sponsored\s+Ad\s*-\s*', '', title, flags=re.IGNORECASE).strip()
             
             # Price extraction with multiple selectors
             price_elem = (container.find('span', class_='a-price-whole') or 
@@ -106,14 +155,24 @@ class EnhancedAmazonMCPClient:
                 if reviews_match:
                     reviews_count = int(reviews_match.group(1))
             
-            # Product URL
-            link_elem = container.find('h2').find('a') if container.find('h2') else None
+            # Product URL — try h2 inner anchor, h2 parent anchor, or any
+            # s-line-clamp link inside the card.
             product_url = ""
+            link_elem = None
+            h2_for_link = container.find('h2')
+            if h2_for_link:
+                link_elem = h2_for_link.find('a') or h2_for_link.find_parent('a')
+            if not link_elem:
+                link_elem = container.find(
+                    'a', {'class': re.compile(r'.*a-link-normal.*s-(line-clamp|no-outline).*')}
+                )
             if link_elem and link_elem.get('href'):
-                product_url = self.base_url + link_elem.get('href')
-            
-            # ASIN extraction
-            asin = self.extract_asin(product_url or container.get('data-asin', ''))
+                href = link_elem.get('href')
+                product_url = href if href.startswith('http') else self.base_url + href
+
+            # ASIN — prefer the container's data-asin attribute, then URL.
+            data_asin = container.get('data-asin') if hasattr(container, 'get') else ''
+            asin = data_asin if data_asin and len(data_asin) >= 8 else self.extract_asin(product_url)
             
             return {
                 "product_name": title,
