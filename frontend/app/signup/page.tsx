@@ -85,7 +85,7 @@ export default function SignupPage() {
       // Reset recaptcha if failed
       if (window.recaptchaVerifier) {
         window.recaptchaVerifier.render().then((widgetId: any) => {
-          grecaptcha.reset(widgetId);
+          (window as any).grecaptcha.reset(widgetId);
         });
       }
     } finally {
