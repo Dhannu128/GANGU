@@ -1,177 +1,266 @@
-# GANGU
+# GANGU 🛒
 
-Voice-first grocery assistant for elderly Indian users. Speak naturally in Hindi, English, or Hinglish — six AI agents search Zepto and Amazon, compare options, apply safety policies, and place the order.
+> **Voice-first grocery assistant for elderly Indian users.**
+> Speak in Hindi, English, or Hinglish — GANGU's AI agents search Zepto & Swiggy Instamart, compare options, apply safety policies, and place the order for you.
 
 ```
 "doodh khatam ho gaya, le aao"
         ↓
-   intent → plan → search → compare → decide → purchase
+   intent → plan → search → compare → decide → purchase → notify
         ↓
    "Zepto · Amul Milk 1 L · ₹64 · 10 min" ✓
 ```
 
 ---
 
-## What's in here
+## What is GANGU?
 
-**Backend** — `api/` + `agents/` + `orchestration/` + `mcp_clients/`
-- 6 **Claude Haiku 4.5** agents (via TokenRouter, OpenAI-compatible) orchestrated with **LangGraph**
-- **Zepto** MCP server (Playwright/Firefox automation) and **Amazon** MCP integration
-- **FastAPI** REST + WebSocket server for live agent updates
-- **MongoDB** checkpointing, **LangSmith** tracing
-- **OpenAI Whisper** for voice transcription
+GANGU is a multi-agent AI system built on **LangGraph**, powered by **Google Gemini 2.5 Flash**. It is designed for elderly Indian users who may find apps difficult — instead of navigating menus, they just speak naturally and GANGU handles everything.
 
-**Frontend** — `frontend/` (Next.js 14 · TypeScript · Tailwind)
-- Public landing: animated aurora hero · trust strip (orders / rating / cities / agents) · live demo · platforms marquee · "Powered by" tech bar · how-it-works · why-GANGU · "GANGU vs traditional apps" comparison matrix · testimonials · pricing · FAQ · mobile hamburger drawer
-- Auth: phone + OTP (Truecaller/Zepto pattern) · Google + WhatsApp social sign-in · trust strip ("256-bit encrypted · No spam · Delete anytime")
-- Authenticated workspace: voice + text input · idle "breathing" mic that invites the first tap · live agent timeline · today panel · quick re-order
-- Sub-pages: past orders · saved lists · family management · **settings with draft state + sticky save bar + toast confirmation**
-- Global toast system for save/error/info feedback
-- Dark glass design with warm saffron accents · persisted state · WCAG-friendly
+**The full flow:**
+1. User speaks or types in Hindi / English / Hinglish
+2. 6 AI agents work in a sequential pipeline, each with one job
+3. Products are found on **Zepto** and **Swiggy Instamart** (via MCP clients)
+4. The best option is selected using a weighted scoring model + safety checks
+5. Order is placed on Zepto via Cash on Delivery (or user confirms first)
+6. A friendly Hindi/Hinglish response is sent back
 
 ---
 
-## Quick start
-
-```powershell
-# 1) One-time backend setup
-pip install -r config/requirements.txt
-pip install -r api/requirements.txt
-python -m playwright install firefox
-cd config && docker-compose up -d && cd ..    # MongoDB
-
-# 2) One-time frontend setup
-cd frontend
-npm install
-cp .env.local.example .env.local
-cd ..
-
-# 3) Configure secrets — see "Environment" below
-#    Edit .env (backend) and frontend/.env.local
-
-# 4) Run (two terminals)
-cd api && python main.py                       # → http://localhost:8000
-cd frontend && npm run dev                     # → http://localhost:3000
-```
-
-Open **http://localhost:3000** → click **Get started** → sign in with phone + OTP `123456` (dev mock), or use the one-tap **Google** / **WhatsApp** buttons (also mocked until the backend ships those endpoints).
-
----
-
-## Frontend routes
-
-| Route | Description |
-|---|---|
-| `/` | Public landing page (aurora hero · trust strip · comparison matrix · mobile drawer) |
-| `/signin` · `/signup` | Phone-OTP + Google + WhatsApp auth (split-screen) |
-| `/app` | Workspace — voice + text input, agent timeline, today, quick re-order |
-| `/app/orders` | Past orders with platform filter and pipeline replay |
-| `/app/lists` | Saved shopping lists, dispatch whole list in one tap |
-| `/app/family` | Invite & manage family members with permissions |
-| `/app/settings` | Language · address · payment · accessibility · privacy · **draft → save bar → toast** |
-
-`/app/*` is protected by an `(authenticated)` route group that redirects unauthenticated users to `/signin`.
-
----
-
-## Backend endpoints
-
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/api/chat/process` | Run the agent pipeline on a user message |
-| `POST` | `/api/order/confirm` | Confirm a pending order from the comparison |
-| `POST` | `/api/cancel` | Cancel an in-flight pipeline |
-| `POST` | `/api/voice/whisper` | Transcribe voice via OpenAI Whisper |
-| `GET` | `/api/session/{id}` | Fetch session state |
-| `GET` | `/api/history` | Fetch order history |
-| `WS` | `/ws/{session_id}` | Live agent step updates |
-
-Auth endpoints (`/api/auth/otp/{request,verify}` and `/api/auth/social`) are stubs in `api/main.py`. The frontend mocks them locally — `123456` works for any phone in dev mode, and Google/WhatsApp buttons fall back to a mock session if the backend isn't reachable.
-
----
-
-## Agent pipeline
-
-| # | Agent | What it does |
-|---|---|---|
-| 1 | `intent_extraction_agent` | Parses Hindi/English/Hinglish into structured intent |
-| 2 | `task_planner_agent` | Builds an ordered execution plan |
-| 3 | `search_agent` | Queries Zepto + Amazon MCPs in parallel |
-| 4 | `comparison_agent` | Scores by price (40%) · speed (25%) · quality (15%) · platform reputation |
-| 5 | `decision_agent` | Applies 6 safety policies (confidence, stock, price sanity, elderly safeguards, etc.) |
-| 6 | `purchase_agent` | Executes the order with audit logging |
-
----
-
-## Folder structure
+## Project Structure
 
 ```
 GANGU/
-├── agents/                        # 6 Gemini-backed agents
-├── api/                           # FastAPI server (main.py + requirements.txt)
-├── config/                        # docker-compose.yml + Python requirements
-├── docs/                          # Architecture & design docs
-├── frontend/                      # Next.js 14 frontend
+├── agents/                        # 6 core AI agents + shared LLM client
+│   ├── llm.py                     # Gemini 2.5 Flash client with 6-key pool
+│   ├── intent_extraction_agent.py # Agent 1: parse user input → structured intent
+│   ├── task_planner_agent.py      # Agent 2: build execution plan
+│   ├── search_agent.py            # Agent 3: search Zepto + Swiggy via MCP
+│   ├── comparison_agent.py        # Agent 4: score & rank products
+│   ├── decision_agent.py          # Agent 5: apply safety policies, pick winner
+│   └── purchase_agent.py          # Agent 6: place real Zepto COD order
+│
+├── orchestration/                 # LangGraph wiring
+│   ├── gangu_graph.py             # StateGraph: 8 nodes + conditional routing + MongoDB checkpoint
+│   ├── gangu_main.py              # CLI entry point
+│   └── gangu_support.py           # Utility helpers
+│
+├── api/                           # FastAPI backend
+│   ├── main.py                    # REST + WebSocket endpoints
+│   └── requirements.txt
+│
+├── mcp_clients/                   # Platform connectors (MCP protocol)
+│   ├── zepto_mcp_client.py        # Zepto: search + cart + checkout via Playwright
+│   ├── swiggy_mcp_client.py       # Swiggy Instamart: search via SSE
+│   ├── swiggy_auth.py             # Swiggy auth helper
+│   ├── amazon_mcp_client.py       # Amazon (⚠️ stub — not yet implemented)
+│   └── enhanced_amazon_client.py  # Amazon (⚠️ stub — not yet implemented)
+│
+├── frontend/                      # Next.js 14 app
 │   ├── app/
-│   │   ├── page.tsx               # Public landing
+│   │   ├── page.tsx               # Public landing page
 │   │   ├── layout.tsx             # Root layout
-│   │   ├── (auth)/{signin,signup}/page.tsx
-│   │   └── (authenticated)/
-│   │       ├── layout.tsx         # AppShell + auth guard
+│   │   ├── signin/page.tsx        # Sign-in (phone OTP + Google + WhatsApp)
+│   │   ├── signup/page.tsx        # Sign-up
+│   │   └── (authenticated)/       # Protected routes — auto-redirects to /signin
 │   │       └── app/
-│   │           ├── page.tsx       # Workspace
-│   │           ├── orders/page.tsx
-│   │           ├── lists/page.tsx
-│   │           ├── family/page.tsx
-│   │           └── settings/page.tsx
+│   │           ├── page.tsx       # Main workspace (voice/text + agent timeline)
+│   │           ├── orders/        # Past orders
+│   │           ├── lists/         # Saved shopping lists
+│   │           ├── family/        # Family member management
+│   │           └── settings/      # Preferences, address, payment, accessibility
 │   ├── components/
-│   │   ├── auth/                  # AuthShell, PhoneOtpForm (Google + WhatsApp)
-│   │   ├── app/                   # AppShell, LeftRail, MobileNav, Greeting,
-│   │   │                          # TodayPanel, QuickReorder, EmptyState
-│   │   ├── landing/               # DemoStrip, Testimonials, Pricing, FAQ,
-│   │   │                          # TrustStrip, BuiltWithBar,
-│   │   │                          # ComparisonMatrix, MobileNav (landing)
-│   │   └── *.tsx                  # VoiceInput, TextInput, AgentTimeline,
-│   │                              # ProductComparison, OrderConfirmation,
-│   │                              # SuccessScreen, Toast (global), Logo
-│   ├── lib/                       # store.ts (Zustand + persist) · api.ts
-│   ├── styles/globals.css         # Design system
-│   └── tailwind.config.js
-├── mcp_clients/                   # zepto_mcp_client.py · amazon_mcp_client.py
-├── orchestration/
-│   ├── gangu_graph.py             # LangGraph StateGraph + MongoDB checkpoint
-│   └── gangu_main.py              # CLI entry point
-├── scripts/                       # PowerShell setup + dev launchers
-├── zepto-cafe-mcp/                # Standalone Zepto MCP server
-└── README.md
+│   │   ├── landing/               # Hero, FAQ, Testimonials, Pricing, ComparisonMatrix
+│   │   ├── auth/                  # PhoneOtpForm, Google & WhatsApp buttons
+│   │   ├── app/                   # AppShell, LeftRail, MobileNav, TodayPanel, etc.
+│   │   └── *.tsx                  # VoiceInput, AgentTimeline, ProductComparison, Toast
+│   ├── lib/
+│   │   ├── store.ts               # Zustand global state (with localStorage persist)
+│   │   └── api.ts                 # API call helpers
+│   └── styles/globals.css         # Design tokens
+│
+├── config/                        # Docker Compose (MongoDB) + Python requirements
+├── scripts/                       # PowerShell setup & dev launchers
+├── docs/                          # Detailed architecture documents
+├── logs/                          # Runtime logs
+├── .env.example                   # Environment variable template — copy to .env
+├── start_gangu.py                 # One-command startup script
+└── render.yaml                    # Render.com deployment config
 ```
 
 ---
 
-## Environment
+## Agent Pipeline — How It Works
 
-### Backend `.env` (project root)
+The full pipeline is a **LangGraph StateGraph** defined in `orchestration/gangu_graph.py`. It has 8 nodes and one conditional routing branch.
 
-```env
-# LLM — TokenRouter (OpenAI-compatible) → Claude Haiku 4.5
-TOKENROUTER_API_KEY=sk-...
-TOKENROUTER_BASE_URL=https://api.tokenrouter.com/v1
-LLM_MODEL=claude-haiku-4-5
-
-LANGSMITH_API_KEY=...
-LANGSMITH_PROJECT=GANGU
-
-ZEPTO_PHONE_NUMBER=98xxxxxxxx
-ZEPTO_DEFAULT_ADDRESS=Home
-
-OPENAI_API_KEY=...                  # for Whisper voice transcription only
-MONGODB_URI=mongodb://localhost:27017
+```
+START
+  │
+  ▼
+[1] intent_extraction    — Parses Hindi/Hinglish/English → structured intent JSON
+  │
+  ▼
+[2] task_planner         — Builds an ordered execution plan from intent
+  │
+  ├─ intent is "buy" or "reorder" ─────────────────────────────────┐
+  │                                                                 ▼
+  │                                                          [3] search
+  │                                                     Zepto + Swiggy Instamart
+  │                                                                 │
+  │                                                                 ▼
+  │                                                         [4] comparison
+  │                                                    Normalise, score & rank
+  │                                                                 │
+  │                                                                 ▼
+  │                                                          [5] decision
+  │                                                     Apply 6 safety policies
+  │                                                                 │
+  │                                                                 ▼
+  │                                                          [6] purchase
+  │                                                   Zepto COD / simulate others
+  │                                                                 │
+  │                                                                 ▼
+  │                                                        [7] notification ──► END
+  │
+  └─ all other intents ──► [8] query_info_only ────────────────────────────────► END
 ```
 
-All six agents share a single OpenAI-compatible client defined in
-`agents/llm.py`, which routes every chat completion to TokenRouter. To swap
-models (e.g. test against a different Claude or GPT variant), change
-`LLM_MODEL` — no code edits needed.
+### Agent Descriptions
+
+| # | Node | File | What it does |
+|---|---|---|---|
+| 1 | `intent_extraction` | `agents/intent_extraction_agent.py` | Parses user input → JSON with `item`, `quantity`, `urgency`, `language`, `confidence`, `needs_clarification` |
+| 2 | `task_planner` | `agents/task_planner_agent.py` | Creates an ordered step-by-step plan based on the detected intent |
+| 3 | `search` | `agents/search_agent.py` | Queries **Zepto** (stdio/Playwright MCP) and **Swiggy Instamart** (SSE MCP) in parallel; returns raw product list |
+| 4 | `comparison` | `agents/comparison_agent.py` | Normalises data across platforms; scores by **price 40% · speed 25% · quality 15% · platform reputation 20%** |
+| 5 | `decision` | `agents/decision_agent.py` | Applies 6 safety policies (confidence, stock, price sanity, elderly safeguards, etc.); outputs one of: `auto_buy`, `confirm_with_user`, `clarify_needed`, `no_good_option` |
+| 6 | `purchase` | `agents/purchase_agent.py` | Executes real Zepto COD order via MCP (simulates for other platforms); full audit logging; respects `GANGU_DRY_RUN` |
+| 7 | `notification` | `orchestration/gangu_graph.py` | Generates a friendly Hindi/Hinglish response based on the final outcome |
+| 8 | `query_info_only` | `orchestration/gangu_graph.py` | Handles informational queries — RAG placeholder (not yet built) |
+
+---
+
+## LLM — Google Gemini 2.5 Flash
+
+All agents share one LLM client defined in `agents/llm.py`.
+
+- **Model:** `gemini-2.5-flash` (default; override via `LLM_MODEL` in `.env`)
+- **SDK:** `google-generativeai` (`google.genai`)
+- **Key pool:** 6 Gemini API keys are stored in `llm.py`; one is **randomly chosen per call** to distribute load and avoid per-key rate limits
+- **No code changes needed** to switch models — just change `LLM_MODEL`
+
+```python
+# agents/llm.py (simplified)
+DEFAULT_MODEL = "gemini-2.5-flash"
+GEMINI_KEYS = ["key1", "key2", ..., "key6"]   # pool of 6 keys
+
+def Client():
+    api_key = random.choice(GEMINI_KEYS)       # random key each call
+    return genai.Client(api_key=api_key)
+```
+
+> **Note for production:** Move the keys from source code into `.env` and load them with `os.getenv()`.
+
+---
+
+## MCP Clients (Platform Connectors)
+
+GANGU uses the **Model Context Protocol (MCP)** to talk to shopping platforms:
+
+| Client | File | Transport | Status |
+|---|---|---|---|
+| **Zepto** | `mcp_clients/zepto_mcp_client.py` | `stdio` (Playwright/Firefox) | ✅ Working — search + cart + checkout |
+| **Swiggy Instamart** | `mcp_clients/swiggy_mcp_client.py` | `SSE` over HTTP | ✅ Working — search only |
+| Amazon | `mcp_clients/amazon_mcp_client.py` | — | ⚠️ Stub — not implemented |
+
+The **Zepto MCP client** includes a built-in product URL catalog (onion, milk, dal, rice, bread, paneer, etc.) so it can look up product pages directly without an extra search step.
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Python 3.11+
+- Node.js 18+
+- Docker (for MongoDB)
+- Playwright Firefox (`python -m playwright install firefox`)
+
+### 1 — Backend Setup
+
+```powershell
+# Install Python dependencies
+pip install -r config/requirements.txt
+pip install -r api/requirements.txt
+
+# Install Playwright Firefox (needed for Zepto MCP)
+python -m playwright install firefox
+
+# Start MongoDB via Docker
+cd config && docker-compose up -d && cd ..
+
+# Copy and fill in env vars
+copy .env.example .env
+# Edit .env with your values (see "Environment Variables" below)
+```
+
+### 2 — Frontend Setup
+
+```powershell
+cd frontend
+npm install
+copy .env.local.example .env.local
+# Edit frontend/.env.local if your backend URL is different
+cd ..
+```
+
+### 3 — Run (two terminals)
+
+```powershell
+# Terminal 1 — Backend
+cd api && python main.py          # → http://localhost:8000
+
+# Terminal 2 — Frontend
+cd frontend && npm run dev        # → http://localhost:3000
+```
+
+Open **http://localhost:3000** → **Get Started** → phone + OTP `123456` (dev mock).
+
+### One-command start (optional)
+
+```powershell
+python start_gangu.py
+```
+
+---
+
+## Environment Variables
+
+### Backend `.env` (project root) — copy from `.env.example`
+
+```env
+# LLM — default model is set in agents/llm.py; override here if needed
+LLM_MODEL=gemini-2.5-flash
+
+# LangSmith tracing (optional — set false to disable)
+LANGSMITH_TRACING=true
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_API_KEY=your_langsmith_api_key
+LANGSMITH_PROJECT=GANGU
+
+# Zepto MCP (your Zepto-registered phone number)
+ZEPTO_PHONE_NUMBER=your_10_digit_phone
+ZEPTO_DEFAULT_ADDRESS=Home
+
+# OpenAI Whisper (voice transcription only)
+OPENAI_API_KEY=your_openai_api_key
+
+# MongoDB (LangGraph checkpointing)
+MONGODB_URI=mongodb://localhost:27017
+
+# Safety — KEEP TRUE during dev/testing, set false only in production
+GANGU_DRY_RUN=true
+```
 
 ### Frontend `frontend/.env.local`
 
@@ -182,46 +271,140 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 
 ---
 
-## Tech stack
+## Frontend Routes
 
-**Backend:** Python 3.11+ · LangGraph · Claude Haiku 4.5 (via TokenRouter, OpenAI SDK) · FastAPI · WebSockets · MongoDB · Playwright · OpenAI Whisper · LangSmith
+| Route | Description |
+|---|---|
+| `/` | Public landing — aurora hero · trust strip · comparison matrix · FAQ · mobile drawer |
+| `/signin` | Sign in — phone + OTP · Google · WhatsApp (social auth mocked in dev) |
+| `/signup` | New user registration |
+| `/app` | Workspace — voice/text input · idle "breathing" mic · live agent timeline · today panel · quick re-order |
+| `/app/orders` | Past orders with platform filter + pipeline replay |
+| `/app/lists` | Saved shopping lists — dispatch a whole list in one tap |
+| `/app/family` | Invite & manage family members with permissions |
+| `/app/settings` | Language · address · payment · accessibility · privacy · **draft → save bar → toast** |
 
-**Frontend:** Next.js 14 (App Router) · TypeScript 5 · Tailwind CSS 3 · Zustand 4 (with persist) · lucide-react · Plus Jakarta Sans + Inter · axios
-
-**Infrastructure:** Docker Compose for MongoDB · PowerShell setup scripts
+All `/app/*` routes are inside the `(authenticated)` route group and auto-redirect to `/signin` if the user is not logged in.
 
 ---
 
-## Dev tips
+## Backend API Endpoints
 
-- **Dev OTP:** `123456` works for any phone number (frontend mock fallback).
-- **TypeScript check:** `cd frontend && npx tsc --noEmit`.
-- **Reset state:** clear the `gangu-store` key in browser localStorage to wipe persisted auth.
-- **Cancel an order:** the agent timeline has a Cancel button while a pipeline is running.
-- **Windows console:** `api/main.py` reconfigures stdout to UTF-8 so emoji prints don't crash on cp1252 consoles.
-- **Adding a platform:** copy `mcp_clients/zepto_mcp_client.py` as a template; register the new client in `agents/search_agent.py`.
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/chat/process` | Run the full agent pipeline on a user message |
+| `POST` | `/api/order/confirm` | Confirm a pending order (when agent asks for confirmation) |
+| `POST` | `/api/cancel` | Cancel an in-flight pipeline run |
+| `POST` | `/api/voice/whisper` | Transcribe voice audio via OpenAI Whisper |
+| `GET` | `/api/session/{id}` | Fetch current session state |
+| `GET` | `/api/history` | Fetch order history |
+| `WS` | `/ws/{session_id}` | WebSocket for live agent step updates (used by agent timeline) |
+| `POST` | `/api/auth/otp/request` | Auth stub — mocked in frontend |
+| `POST` | `/api/auth/otp/verify` | Auth stub — mocked in frontend |
+| `POST` | `/api/auth/social` | Auth stub — Google/WhatsApp (mocked in frontend) |
+
+---
+
+## Tech Stack
+
+### Backend
+| Technology | Purpose |
+|---|---|
+| Python 3.11+ | Runtime |
+| **LangGraph** | Agent orchestration (StateGraph + conditional routing) |
+| **Google Gemini 2.5 Flash** | LLM powering all 6 agents |
+| **FastAPI** | REST + WebSocket API server |
+| **Playwright (Firefox)** | Browser automation for Zepto MCP |
+| **MCP (Model Context Protocol)** | Platform integrations (Zepto, Swiggy) |
+| MongoDB | LangGraph checkpointing — session memory and resumability |
+| OpenAI Whisper | Voice transcription |
+| LangSmith | Agent tracing and observability |
+
+### Frontend
+| Technology | Purpose |
+|---|---|
+| Next.js 14 (App Router) | Framework |
+| TypeScript 5 | Type safety |
+| Tailwind CSS 3 | Styling |
+| Zustand 4 + persist | Global state with localStorage persistence |
+| lucide-react | Icons |
+| axios | HTTP API calls |
+| Plus Jakarta Sans + Inter | Typography |
+
+### Infrastructure
+| Technology | Purpose |
+|---|---|
+| Docker Compose | MongoDB container |
+| Render.com | Backend deployment (`render.yaml`) |
+| PowerShell scripts | Local dev setup (`scripts/`) |
+
+---
+
+## Key Design Decisions
+
+**Why LangGraph?**
+LangGraph gives fine-grained control over the pipeline. Each agent is a named **graph node** and routing between them uses **conditional edges** (buy-intent → full search pipeline; info-intent → query handler). MongoDB checkpointing lets sessions survive failures and be resumed.
+
+**Why a random key pool in `llm.py`?**
+Gemini free-tier keys have per-minute rate limits. By randomly selecting from a pool of 6 keys, GANGU handles more concurrent requests without throttling.
+
+**Why Playwright for Zepto?**
+Zepto has no public API. The Zepto MCP client uses Playwright to automate Firefox — navigate the site, search, add to cart, checkout — exactly like a human. This is wrapped as an MCP server so agents call it as a tool.
+
+**Why `GANGU_DRY_RUN`?**
+The Purchase Agent checks this flag before placing any real order. When `true`, it logs the intent but never submits to Zepto. Always keep this `true` during development.
+
+---
+
+## Dev Tips
+
+- **Dev OTP:** `123456` works for any phone number (frontend mock)
+- **TypeScript check:** `cd frontend && npx tsc --noEmit`
+- **Reset auth state:** Clear the `gangu-store` key in browser localStorage
+- **Cancel a pipeline:** The agent timeline has a **Cancel** button while running
+- **Add a new platform:** Copy `mcp_clients/zepto_mcp_client.py` as a template; register it in `agents/search_agent.py`
+- **Windows UTF-8:** `api/main.py` reconfigures stdout to UTF-8 so emoji don't crash on Windows cp1252 consoles
+- **Disable LangSmith:** Set `LANGSMITH_TRACING=false` in `.env`
 
 ---
 
 ## Status
 
-**Shipped:** all 6 agents · Zepto + Amazon MCP · LangGraph orchestration · MongoDB checkpointing · FastAPI backend · Next.js frontend (landing + auth + workspace + 4 sub-routes) · investor-ready landing (aurora hero · trust strip · comparison matrix · mobile drawer · "Powered by" tech bar) · social auth (Google + WhatsApp, mocked) · settings draft/save UX with toasts · idle "breathing" mic · global toast system
+### ✅ Shipped
+- All 6 agents + notification + query_info graph nodes
+- Zepto MCP client (search + cart + checkout via Playwright)
+- Swiggy Instamart MCP client (search via SSE)
+- LangGraph orchestration with conditional routing + MongoDB checkpointing
+- FastAPI backend (REST + WebSocket)
+- Next.js frontend: landing · auth · workspace · 4 sub-routes
+- Investor-ready landing (aurora hero · trust strip · comparison matrix · mobile drawer)
+- Social auth (Google + WhatsApp, mocked in dev)
+- Settings draft/save UX with toasts
+- Idle "breathing" mic animation + global toast system
 
-**Not yet:** real `/api/auth/*` endpoints (frontend mocks them) · backend persistence for family members + saved lists (frontend uses localStorage) · Blinkit/BigBasket/JioMart/Swiggy/Dunzo MCP clients
+### ⚠️ Not Yet / Stubs
+- Real `/api/auth/*` endpoints — frontend mocks them (`123456` works in dev)
+- Backend persistence for family members + saved lists (localStorage only)
+- Amazon MCP client (`amazon_mcp_client.py` is an empty stub)
+- BigBasket / JioMart / Dunzo MCP clients
+- RAG-based `query_info_only` agent (placeholder message only)
+- Gemini API keys moved out of source code into `.env`
 
 ---
 
 ## Documentation
 
-Detailed docs live in [`docs/`](docs/):
+| File | Contents |
+|---|---|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Full system design + data flow |
+| [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md) | Production setup on Render.com |
+| [`MCP_SETUP_GUIDE.md`](MCP_SETUP_GUIDE.md) | How to add new platform MCP clients |
+| [`QUICKSTART.md`](QUICKSTART.md) | Minimal setup guide |
+| [`FRONTEND_QUICKSTART.md`](FRONTEND_QUICKSTART.md) | Frontend-only setup |
+| [`PROJECT_NAVIGATION.md`](PROJECT_NAVIGATION.md) | How to navigate the codebase |
+| [`IMPLEMENTATION_SUMMARY.md`](IMPLEMENTATION_SUMMARY.md) | What was built and when |
 
-- `ARCHITECTURE.md` — full system design
-- `PURCHASE_AGENT_ARCHITECTURE.md` — purchase flow & safety policies
-- `FRONTEND_ARCHITECTURE.md` — frontend ↔ backend ↔ agent flow
-- `DEPLOYMENT_GUIDE.md` — production setup
-- `MCP_SETUP_GUIDE.md` — adding new platform MCPs
-
-Top-level setup helpers: `QUICKSTART.md`, `FRONTEND_QUICKSTART.md`, `PROJECT_NAVIGATION.md`.
+Detailed docs also live in [`docs/`](docs/).
 
 ---
 

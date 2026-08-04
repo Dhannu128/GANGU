@@ -262,7 +262,7 @@ def simple_fallback_parser(user_input: str) -> dict:
         "chahiye", "chahye", "chahta", "chahti",
         "want", "need", "get",
         "bhej do", "bhejo",
-        "from zepto", "through zepto", "from blinkit", "from amazon",
+        "from zepto", "through zepto", "from swiggy", "from swiggy instamart", "from amazon",
     ]
     has_buy_intent = any(kw in text_lower for kw in buy_keywords)
     

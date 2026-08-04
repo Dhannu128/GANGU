@@ -241,7 +241,7 @@ Always output in this EXACT format:
     },
     {
       "rank": 2,
-      "platform": "Blinkit",
+      "platform": "Swiggy",
       "normalized_attributes": {
         "price": 110.00,
         "unit_price_label": "₹110.00/kg",
@@ -332,7 +332,7 @@ Always output in this EXACT format:
     "primary_failed_reason": "If BigBasket is unavailable or order fails",
     "secondary_option": {
       "rank": 2,
-      "platform": "Blinkit",
+      "platform": "Swiggy",
       "product_name": "White Chickpeas (Kabuli Chana)",
       "price": 110.00,
       "reason": "Good backup with faster delivery (12 hours) and better rating (4.6★), only ₹15 more expensive"
@@ -770,7 +770,7 @@ Always output in this EXACT format:
     },
     {
       "rank": 2,
-      "platform": "Blinkit",
+      "platform": "Swiggy",
       "normalized_attributes": {
         "price": 110.00,
         "delivery_time_hours": 0.5,
@@ -819,7 +819,7 @@ Always output in this EXACT format:
     ],
     "risks_identified": [
       "MEDIUM RISK: Low stock - order might get cancelled",
-      "Mitigation: Have Blinkit as strong backup (30 min delivery)"
+      "Mitigation: Have Swiggy Instamart as strong backup (30 min delivery)"
     ],
     "policy_applied": [
       "Policy 4: High urgency → Speed is priority",
@@ -828,7 +828,7 @@ Always output in this EXACT format:
     ]
   },
   "explanation_for_user": {
-    "simple_message": "Zepto se 10 minute mein mil jayega lekin stock kam hai. Confirm karein ya backup option (Blinkit - 30 min) lein?",
+    "simple_message": "Zepto se 10 minute mein mil jayega lekin stock kam hai. Confirm karein ya backup option (Swiggy Instamart - 30 min) lein?",
     "why_this_option": "Fastest option for your urgent need, but stock is limited so there's a small risk of cancellation.",
     "what_user_gets": "Ultra-fast delivery (10 min), best quality (4.7★), but stock risk exists"
   },
@@ -837,7 +837,7 @@ Always output in this EXACT format:
     "primary_failed_reason": "If Zepto stock runs out or order cancelled",
     "secondary_option": {
       "rank": 2,
-      "platform": "Blinkit",
+      "platform": "Swiggy",
       "product_name": "White Chickpeas (Kabuli Chana)",
       "price": 110.00,
       "reason": "Excellent backup with good stock, 30 min delivery, and ₹10 cheaper"
@@ -856,14 +856,14 @@ Always output in this EXACT format:
         "warning": "Stock kam hai - cancel ho sakta hai"
       },
       "backup_option": {
-        "platform": "Blinkit",
+        "platform": "Swiggy",
         "price": 110.00,
         "delivery": "30 minutes",
         "note": "Stock available - safer option"
       }
     },
     "user_confirmation_required": true,
-    "confirmation_message": "Zepto 10 min mein dega (₹120) lekin stock kam hai. Ya Blinkit 30 min mein safe delivery (₹110)?"
+    "confirmation_message": "Zepto 10 min mein dega (₹120) lekin stock kam hai. Ya Swiggy Instamart 30 min mein safe delivery (₹110)?"
   },
   "metadata": {
     "timestamp": "2026-01-14T14:00:00Z",
@@ -1342,7 +1342,7 @@ if __name__ == "__main__":
             },
             {
                 "rank": 2,
-                "platform": "Blinkit",
+                "platform": "Swiggy",
                 "product_identity": {
                     "canonical_name": "White Chickpeas (Kabuli Chana)",
                     "brand": "Farm Fresh"

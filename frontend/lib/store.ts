@@ -31,6 +31,8 @@ export interface User {
   id: string
   name: string
   phone: string
+  email?: string
+  photoURL?: string
   language: Language
   address: string
 }

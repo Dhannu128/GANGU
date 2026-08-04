@@ -264,28 +264,40 @@ def search_agent(state: GANGUState) -> GANGUState:
         
         # Fallback: Mock search results
         state["search_results"] = {
-            "platforms_searched": ["Blinkit", "Amazon", "Flipkart"],
+            "platforms_searched": ["Zepto", "Swiggy"],
             "total_results_found": 3,
             "results": [
                 {
-                    "platform": "Blinkit",
-                    "item_name": item_name,
-                    "price": 110,
-                    "delivery_time": "15 minutes",
+                    "platform": "Zepto",
+                    "item_name": f"{item_name} (Zepto)",
+                    "brand": "Zepto",
+                    "price": 85,
+                    "currency": "INR",
+                    "delivery_time": "10 minutes",
+                    "delivery_time_hours": 0.17,
                     "rating": 4.4,
-                    "available": True
+                    "reviews_count": 500,
+                    "availability": True,
+                    "stock_status": "In Stock",
+                    "source": "fallback"
                 },
                 {
-                    "platform": "Amazon",
-                    "item_name": item_name,
-                    "price": 95,
-                    "delivery_time": "Tomorrow",
-                    "rating": 4.6,
-                    "available": True
+                    "platform": "Swiggy",
+                    "item_name": f"{item_name} (Swiggy Instamart)",
+                    "brand": "Swiggy",
+                    "price": 90,
+                    "currency": "INR",
+                    "delivery_time": "12 minutes",
+                    "delivery_time_hours": 0.2,
+                    "rating": 4.3,
+                    "reviews_count": 800,
+                    "availability": True,
+                    "stock_status": "In Stock",
+                    "source": "fallback"
                 }
             ]
         }
-        state["platforms_searched"] = ["Blinkit", "Amazon", "Flipkart"]
+        state["platforms_searched"] = ["Zepto", "Swiggy"]
     
     return state
 

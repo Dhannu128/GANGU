@@ -22,7 +22,7 @@ import {
   HeartHandshake,
 } from 'lucide-react'
 
-const PLATFORMS = ['Zepto', 'Amazon', 'Blinkit', 'BigBasket', 'JioMart', 'Swiggy Instamart', 'Dunzo']
+const PLATFORMS = ['Swiggy Instamart', 'Zepto', 'Amazon', 'BigBasket', 'JioMart', 'Dunzo']
 
 const HOW_IT_WORKS = [
   {

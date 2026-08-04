@@ -56,6 +56,8 @@ export default function ProductComparison({ onSelectProduct }: ProductComparison
                   <span className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
                     {product.platform === 'Amazon' ? (
                       <Package className="w-4 h-4 text-amber-300" />
+                    ) : product.platform === 'Swiggy' ? (
+                      <Truck className="w-4 h-4 text-orange-400" />
                     ) : (
                       <Truck className="w-4 h-4 text-cyan-300" />
                     )}

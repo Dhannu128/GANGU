@@ -76,7 +76,7 @@ You output CLEAN, RANKED, SCORED comparisons for Decision Agent.
 
 ### 1️⃣ Product Identity Resolution
 When you see:
-- "Aashirvaad Atta Select 5kg" (Blinkit)
+- "Aashirvaad Atta Select 5kg" (Swiggy Instamart)
 - "Aashirwad Wheat Flour 5 KG" (Zepto)
 - "Ashirvad Atta 5kg Pack" (BigBasket)
 
@@ -331,11 +331,11 @@ Always output in this EXACT format:
     "quantity": "1 kg",
     "urgency": "normal"
   },
-  "platforms_searched": ["Blinkit", "BigBasket", "Zepto"],
+  "platforms_searched": ["Swiggy", "Amazon", "Zepto"],
   "total_results_found": 3,
   "results": [
     {
-      "platform": "Blinkit",
+      "platform": "Swiggy",
       "item_name": "White Chickpeas (Kabuli Chana)",
       "brand": "Farm Fresh",
       "price": 110.00,
@@ -435,7 +435,7 @@ Always output in this EXACT format:
     },
     {
       "rank": 2,
-      "platform": "Blinkit",
+      "platform": "Swiggy",
       "product_identity": {
         "canonical_name": "White Chickpeas (Kabuli Chana)",
         "original_name": "White Chickpeas (Kabuli Chana)",
@@ -1200,11 +1200,11 @@ if __name__ == "__main__":
             "quantity": "1 kg",
             "urgency": "normal"
         },
-        "platforms_searched": ["Blinkit", "BigBasket", "Zepto"],
+        "platforms_searched": ["Swiggy", "Amazon", "Zepto"],
         "total_results_found": 3,
         "results": [
             {
-                "platform": "Blinkit",
+                "platform": "Swiggy",
                 "item_name": "White Chickpeas (Kabuli Chana)",
                 "brand": "Farm Fresh",
                 "price": 110.00,

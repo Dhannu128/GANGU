@@ -112,7 +112,7 @@ def check_mcp_clients():
     
     clients = [
         ("mcp_clients.zepto_mcp_client", "Zepto MCP"),
-        ("mcp_clients.amazon_mcp_client", "Amazon MCP")
+        ("mcp_clients.swiggy_mcp_client", "Swiggy MCP")
     ]
     
     mcp_count = 0

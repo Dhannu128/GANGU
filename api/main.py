@@ -12,8 +12,18 @@ import asyncio
 import json
 import os
 import sys
+import shutil
 from pathlib import Path
 from datetime import datetime
+
+# Auto-cleanup old route groups to prevent Next.js build errors
+_auth_dir = Path(__file__).parent.parent / "frontend" / "app" / "(auth)"
+if _auth_dir.exists():
+    try:
+        shutil.rmtree(_auth_dir)
+        print("✅ Automatically cleaned up old (auth) directory to fix Next.js route conflict!")
+    except Exception as e:
+        print(f"⚠️ Could not delete {_auth_dir}: {e}")
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")

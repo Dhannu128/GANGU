@@ -27,9 +27,8 @@ const AGENTS = [
 ]
 
 const PRODUCTS = [
-  { platform: 'Amazon', name: 'Amul Taaza Toned Milk 1 L', price: 68, rating: 4.4, eta: 'Tomorrow' },
   { platform: 'Zepto', name: 'Amul Taaza Toned Milk 1 L', price: 64, rating: 4.6, eta: '10 min' },
-  { platform: 'Blinkit', name: 'Amul Gold Full Cream 1 L', price: 78, rating: 4.5, eta: '15 min' },
+  { platform: 'Swiggy Instamart', name: 'Amul Gold Full Cream 1 L', price: 62, rating: 4.5, eta: '15 min' },
 ]
 
 export default function DemoStrip() {

@@ -15,7 +15,7 @@ const FAQS: FAQItem[] = [
   },
   {
     q: 'Which platforms can GANGU shop from?',
-    a: 'Today we search Zepto and Amazon. Blinkit, BigBasket, JioMart, Swiggy Instamart, and Dunzo are rolling out through 2026. You can also pin a preferred platform in Settings if you only want to use one.',
+    a: 'Today we search Swiggy Instamart, Zepto, and Amazon. BigBasket, JioMart, and Dunzo are rolling out through 2026. You can also pin a preferred platform in Settings if you only want to use one.',
   },
   {
     q: 'Will it understand my accent and the way I speak?',

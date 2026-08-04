@@ -61,13 +61,13 @@ GANGU: 🎉 Order placed! Delivery today at 6 PM
 See exactly what GANGU is doing:
 - ✓ Understanding your request
 - ✓ Identifying item: White Chickpeas (1 kg)
-- ✓ Searching Blinkit ✓ Amazon ✓ Flipkart
+- ✓ Searching Swiggy Instamart ✓ Zepto ✓ Amazon
 - ✓ Comparing prices & reviews
 - ✓ Selecting best option
 
 ### Smart Product Cards
 Beautiful comparison view:
-- Platform logo (Blinkit/Amazon)
+- Platform logo (Swiggy/Zepto/Amazon)
 - Product image
 - Price in ₹
 - Rating ⭐
@@ -77,7 +77,7 @@ Beautiful comparison view:
 ### Trust-Focused Confirmation
 Before any purchase:
 ```
-"I'll place this order on Blinkit for ₹89. 
+"I'll place this order on Swiggy Instamart for ₹89. 
 Delivery by 7 PM. Should I proceed?"
 
 [✅ Confirm Purchase] [🔁 Change Option] [❌ Cancel]

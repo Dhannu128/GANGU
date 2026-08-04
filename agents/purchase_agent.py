@@ -45,12 +45,6 @@ except ImportError:
     ZEPTO_AVAILABLE = False
     print("⚠️  Zepto MCP client not available")
 
-try:
-    from mcp_clients.amazon_mcp_client import AmazonMCPClient
-    AMAZON_AVAILABLE = True
-except ImportError:
-    AMAZON_AVAILABLE = False
-    print("⚠️  Amazon MCP client not available")
 
 # ---------------- API CONFIGURATION ---------------- #
 
@@ -439,11 +433,11 @@ Log to audit file:
 ```json
 {
   "final_decision": {
-    "selected_platform": "Blinkit",
+    "selected_platform": "Swiggy",
     "product": {
       "name": "Milk",
       "price": 65.00,
-      "product_id": "blinkit_milk_001"
+      "product_id": "swiggy_milk_001"
     },
     "fallback_options": [
       {
@@ -459,7 +453,7 @@ Log to audit file:
 **Processing:**
 ```
 ✅ Pre-validation: Passed
-❌ Blinkit add_to_cart: Failed (API timeout)
+❌ Swiggy add_to_cart: Failed (API timeout)
 🔄 Retry 1: Failed
 🔄 Retry 2: Failed
 ⚠️ Switching to fallback: Zepto
@@ -484,13 +478,13 @@ Log to audit file:
   "retry_attempts": 2,
   "failures_encountered": [
     {
-      "platform": "Blinkit",
+      "platform": "Swiggy",
       "step": "add_to_cart",
       "reason": "API timeout"
     }
   ],
   "fallback_used": true,
-  "user_message": "✅ Order placed via Zepto (Blinkit was unavailable). Milk arriving soon."
+  "user_message": "✅ Order placed via Zepto (Swiggy was unavailable). Milk arriving soon."
 }
 ```
 

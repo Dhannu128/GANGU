@@ -62,7 +62,7 @@ You output a CLEAR ACTION PLAN for downstream agents.
 ❌ Do NOT fetch prices
 ❌ Do NOT compare options
 ❌ Do NOT make purchase decisions
-❌ Do NOT select specific platforms (Blinkit, Amazon, etc.)
+❌ Do NOT select specific platforms (Swiggy, Amazon, etc.)
 ❌ Do NOT execute any API calls
 ❌ Do NOT add any text outside JSON
 ❌ Do NOT make assumptions about user preferences
@@ -326,7 +326,7 @@ Always output in this EXACT format:
       "step_number": 1,
       "action": "search_quick_delivery_platforms",
       "agent": "search_agent",
-      "description": "Search for milk on platforms known for fast delivery (Blinkit, Zepto, etc.)",
+      "description": "Search for milk on platforms known for fast delivery (Swiggy Instamart, Zepto, etc.)",
       "depends_on": [],
       "can_parallel": true
     },

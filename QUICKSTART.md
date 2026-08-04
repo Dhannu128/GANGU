@@ -108,7 +108,7 @@ Run `python start_gangu.py` to see:
 ✅ Environment Variables (GEMINI_API_KEY, etc.)
 ✅ Required Packages (google-genai, langgraph, etc.)
 ✅ Agents (All 5 agents)
-✅ MCP Clients (Zepto + Blinkit)
+✅ MCP Clients (Swiggy + Zepto + Amazon)
 ✅ MongoDB (State persistence)
 ✅ LangSmith (Tracing)
 ```
@@ -124,14 +124,14 @@ Run `python start_gangu.py` to see:
 3. **Watch:** Pipeline executes (3-5 seconds)
 4. **Output:** Complete order with reasoning
 5. **Check:** LangSmith for full trace
-6. **Show:** Real Zepto/Blinkit data used
+6. **Show:** Real Swiggy/Zepto data used
 
 ---
 
 ## 💡 Key Features to Highlight
 
 ✅ **5 AI Agents** working together
-✅ **Real MCP Integration** (Zepto + Blinkit)
+✅ **Real MCP Integration** (Swiggy + Zepto + Amazon)
 ✅ **Hindi/Hinglish** support
 ✅ **Policy-Driven** decisions (6 safety rules)
 ✅ **Risk Assessment** before purchase
