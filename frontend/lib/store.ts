@@ -5,7 +5,7 @@ export interface AgentStep {
   step: string
   status: 'processing' | 'complete' | 'error'
   message: string
-  data?: any
+  data?: { platforms?: string[]; [key: string]: unknown }
   timestamp: string
 }
 
@@ -17,12 +17,24 @@ export interface Product {
   rating?: number
   delivery_time?: string
   stock_status?: string
+  source?: string
 }
 
 export interface Comparison {
   products: Product[]
   recommended_index?: number
   reasoning?: string
+}
+
+export interface IntentResult {
+  platforms?: string[]
+  [key: string]: unknown
+}
+
+export interface RecommendationResult {
+  selected_index?: number
+  reasoning?: string
+  [key: string]: unknown
 }
 
 export type Language = 'hi' | 'en' | 'hinglish'
@@ -100,13 +112,14 @@ interface GANGUStore {
   currentStep: string | null
 
   // Results
-  intent: any
+  intent: IntentResult | null
   comparison: Comparison | null
-  recommendation: any
+  recommendation: RecommendationResult | null
 
   // Order
   orderPlaced: boolean
   orderId: string | null
+  orderSimulated: boolean
 
   // Cancel
   isCancelling: boolean
@@ -134,10 +147,10 @@ interface GANGUStore {
   setTranscription: (text: string) => void
   addAgentStep: (step: AgentStep) => void
   setCurrentStep: (step: string | null) => void
-  setIntent: (intent: any) => void
+  setIntent: (intent: IntentResult) => void
   setComparison: (comparison: Comparison) => void
-  setRecommendation: (recommendation: any) => void
-  setOrderPlaced: (placed: boolean, orderId?: string) => void
+  setRecommendation: (recommendation: RecommendationResult) => void
+  setOrderPlaced: (placed: boolean, orderId?: string, simulated?: boolean) => void
   setCancelling: (cancelling: boolean) => void
   setCancelled: (cancelled: boolean) => void
   setAbortController: (controller: AbortController | null) => void
@@ -235,6 +248,7 @@ export const useGANGUStore = create<GANGUStore>()(
       recommendation: null,
       orderPlaced: false,
       orderId: null,
+      orderSimulated: false,
       isCancelling: false,
       isCancelled: false,
       abortController: null,
@@ -270,7 +284,8 @@ export const useGANGUStore = create<GANGUStore>()(
       setIntent: (intent) => set({ intent }),
       setComparison: (comparison) => set({ comparison }),
       setRecommendation: (recommendation) => set({ recommendation }),
-      setOrderPlaced: (placed, orderId) => set({ orderPlaced: placed, orderId: orderId || null }),
+      setOrderPlaced: (placed, orderId, simulated = false) =>
+        set({ orderPlaced: placed, orderId: orderId || null, orderSimulated: simulated }),
       setCancelling: (cancelling) => set({ isCancelling: cancelling }),
       setCancelled: (cancelled) =>
         set(
@@ -292,18 +307,24 @@ export const useGANGUStore = create<GANGUStore>()(
           recommendation: null,
           orderPlaced: false,
           orderId: null,
+          orderSimulated: false,
           isCancelling: false,
           isCancelled: false,
         }),
 
       signIn: (user, token) =>
-        set({
-          auth: { isAuthenticated: true, token },
-          user,
-          settings: { ...DEFAULT_SETTINGS, language: user.language, address: user.address },
-          pastOrders: DEMO_PAST_ORDERS,
-          savedLists: DEMO_LISTS,
-          familyMembers: DEMO_FAMILY,
+        set((state) => {
+          const returningUser = state.user?.id === user.id
+          return {
+            auth: { isAuthenticated: true, token },
+            user,
+            settings: returningUser
+              ? state.settings
+              : { ...DEFAULT_SETTINGS, language: user.language, address: user.address },
+            pastOrders: state.pastOrders.length ? state.pastOrders : DEMO_PAST_ORDERS,
+            savedLists: state.savedLists.length ? state.savedLists : DEMO_LISTS,
+            familyMembers: state.familyMembers.length ? state.familyMembers : DEMO_FAMILY,
+          }
         }),
 
       signOut: () =>
@@ -322,6 +343,7 @@ export const useGANGUStore = create<GANGUStore>()(
           recommendation: null,
           orderPlaced: false,
           orderId: null,
+          orderSimulated: false,
         }),
 
       updateSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
@@ -339,9 +361,8 @@ export const useGANGUStore = create<GANGUStore>()(
     }),
     {
       name: 'gangu-store',
-      storage: createJSONStorage(() => (typeof window !== 'undefined' ? localStorage : (undefined as any))),
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        auth: state.auth,
         user: state.user,
         pastOrders: state.pastOrders,
         savedLists: state.savedLists,

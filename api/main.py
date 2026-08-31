@@ -4,26 +4,18 @@ Exposes GANGU agents as REST API with WebSocket support for real-time updates
 """
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile, Query
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any, Literal
 import asyncio
 import json
 import os
 import sys
-import shutil
+import secrets
 from pathlib import Path
 from datetime import datetime
-
-# Auto-cleanup old route groups to prevent Next.js build errors
-_auth_dir = Path(__file__).parent.parent / "frontend" / "app" / "(auth)"
-if _auth_dir.exists():
-    try:
-        shutil.rmtree(_auth_dir)
-        print("✅ Automatically cleaned up old (auth) directory to fix Next.js route conflict!")
-    except Exception as e:
-        print(f"⚠️ Could not delete {_auth_dir}: {e}")
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -49,6 +41,9 @@ if not _is_real_key(os.getenv("LANGSMITH_API_KEY")):
     logging.getLogger("langsmith").setLevel(logging.CRITICAL)
 
 from orchestration.gangu_graph import create_gangu_graph
+from api.security import AuthenticatedUser, authenticate_websocket, get_current_user, ws_tickets
+from api.session_store import session_store
+from api.swiggy_oauth import create_authorization_url, exchange_callback
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -81,8 +76,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Active WebSocket connections
-active_connections: List[WebSocket] = []
+# Active WebSocket connections, isolated by authenticated user and session.
+active_connections: Dict[tuple[str, str], set[WebSocket]] = {}
 
 # Active sessions and cancellation tracking
 active_sessions: Dict[str, bool] = {}  # session_id -> is_cancelled
@@ -91,23 +86,26 @@ session_tasks: Dict[str, asyncio.Task] = {}  # session_id -> task for instant ca
 # Request/Response Models
 class VoiceTranscriptionRequest(BaseModel):
     """Request from Whisper API transcription"""
-    text: str
+    text: str = Field(min_length=1, max_length=10_000)
     language: Optional[str] = "hi"  # Hindi default
     confidence: Optional[float] = 0.0
 
 class ChatRequest(BaseModel):
     """Text-based chat request"""
-    message: str
-    session_id: Optional[str] = None
+    message: str = Field(min_length=1, max_length=2_000)
+    session_id: Optional[str] = Field(default=None, min_length=8, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
 
 class OrderConfirmationRequest(BaseModel):
     """User confirms purchase"""
-    session_id: str
-    selected_product_index: int  # Which product from comparison
+    session_id: str = Field(min_length=8, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    quote_id: str = Field(min_length=16, max_length=128)
+    selected_product_index: int = Field(ge=0, le=100)
+    delivery_address: str = Field(min_length=5, max_length=500)
+    payment_method: Literal["upi", "cod", "card"]
 
 class CancelRequest(BaseModel):
     """Cancel processing request"""
-    session_id: str
+    session_id: str = Field(min_length=8, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
 
 class AgentStatusUpdate(BaseModel):
     """Real-time agent status update"""
@@ -130,8 +128,19 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     WebSocket connection for real-time agent pipeline updates
     Frontend connects here to receive live status
     """
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        await websocket.close(code=4401, reason="Authentication required")
+        return
+    try:
+        session_store.claim_session(session_id, user.uid)
+    except PermissionError:
+        await websocket.close(code=4403, reason="Session access denied")
+        return
+
+    key = (user.uid, session_id)
     await websocket.accept()
-    active_connections.append(websocket)
+    active_connections.setdefault(key, set()).add(websocket)
     
     try:
         await websocket.send_json({
@@ -148,25 +157,56 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             await websocket.send_json({"type": "heartbeat", "status": "alive"})
             
     except WebSocketDisconnect:
-        active_connections.remove(websocket)
+        connections = active_connections.get(key)
+        if connections:
+            connections.discard(websocket)
+            if not connections:
+                active_connections.pop(key, None)
         print(f"Client {session_id} disconnected")
 
 async def broadcast_agent_status(session_id: str, update: AgentStatusUpdate):
-    """Broadcast agent status to all connected clients"""
+    """Send an agent update only to the owning user's session sockets."""
     message = {
         "type": "agent_update",
         "session_id": session_id,
         "timestamp": datetime.now().isoformat(),
-        **update.dict()
+        **update.model_dump()
     }
     
-    for connection in active_connections:
+    user_id = session_store.owner_of(session_id)
+    if user_id is None:
+        return
+    dead_connections: list[WebSocket] = []
+    for connection in list(active_connections.get((user_id, session_id), set())):
         try:
             await connection.send_json(message)
-            # Small delay to ensure message is sent before next update
-            await asyncio.sleep(0.1)
-        except:
-            pass
+        except Exception:
+            dead_connections.append(connection)
+    for connection in dead_connections:
+        active_connections.get((user_id, session_id), set()).discard(connection)
+
+
+@app.post("/api/auth/ws-ticket")
+async def create_websocket_ticket(user: AuthenticatedUser = Depends(get_current_user)):
+    ticket, expires_in = ws_tickets.issue(user)
+    return {"ticket": ticket, "expires_in": expires_in}
+
+
+@app.post("/api/auth/swiggy/start")
+async def start_swiggy_oauth(user: AuthenticatedUser = Depends(get_current_user)):
+    return {"authorization_url": create_authorization_url(user.uid)}
+
+
+@app.get("/api/auth/callback/swiggy", response_class=HTMLResponse)
+async def swiggy_oauth_callback(
+    code: str = Query(min_length=4, max_length=4096),
+    state: str = Query(min_length=16, max_length=512),
+):
+    await exchange_callback(code, state)
+    return HTMLResponse(
+        "<html><body><h1>Swiggy connected successfully</h1>"
+        "<p>You can close this window and return to GANGU.</p></body></html>"
+    )
 
 # ============================================================================
 # REST API ENDPOINTS
@@ -182,7 +222,10 @@ async def root():
     }
 
 @app.post("/api/voice/transcribe")
-async def transcribe_voice(request: VoiceTranscriptionRequest):
+async def transcribe_voice(
+    request: VoiceTranscriptionRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
     """
     Receive transcribed voice input from frontend (Whisper API)
     Returns processed intent
@@ -200,55 +243,55 @@ async def transcribe_voice(request: VoiceTranscriptionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/voice/whisper")
-async def whisper_transcribe(file: UploadFile = File(...)):
+async def whisper_transcribe(
+    file: UploadFile = File(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+):
     """
     OpenAI Whisper API endpoint for voice transcription
     Uses premium API key - ONLY for voice transcription
     """
+    temp_audio_path = None
     try:
         from openai import OpenAI
         import tempfile
-        
-        # Get API key from environment
+
         openai_api_key = os.getenv("OPENAI_API_KEY")
         if not openai_api_key:
-            raise HTTPException(status_code=500, detail="OpenAI API key not configured")
-        
-        # Initialize OpenAI client
-        client = OpenAI(api_key=openai_api_key)
-        
-        # Read audio file from request
+            raise HTTPException(status_code=503, detail="Voice transcription is not configured")
+
         audio_data = await file.read()
-        
-        # Save to temporary file
+        if len(audio_data) > 25 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="Audio file exceeds the 25 MB limit")
+
         with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_audio:
             temp_audio.write(audio_data)
             temp_audio_path = temp_audio.name
-        
-        # Transcribe using Whisper
+
+        client = OpenAI(api_key=openai_api_key)
         with open(temp_audio_path, "rb") as audio_file:
             transcript = client.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file,
-                language="hi"  # Hindi + English mix
+                language="hi",
             )
-        
-        # Cleanup temp file
-        os.unlink(temp_audio_path)
-        
-        return {
-            "success": True,
-            "text": transcript.text,
-            "language": "hi-IN"
-        }
-        
-    except Exception as e:
-        print(f"❌ Whisper error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+
+        return {"success": True, "text": transcript.text, "language": "hi-IN"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"Whisper error: {exc}")
+        raise HTTPException(status_code=502, detail="Voice transcription failed") from exc
+    finally:
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            os.unlink(temp_audio_path)
 
 
 @app.post("/api/chat/process")
-async def process_chat(request: ChatRequest):
+async def process_chat(
+    request: ChatRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
     """
     Main endpoint: Process user input through GANGU pipeline
     Returns: Intent extraction + Task plan + Search results + Comparison
@@ -256,7 +299,14 @@ async def process_chat(request: ChatRequest):
     This is the CORE endpoint that runs the entire agent pipeline
     """
     try:
-        session_id = request.session_id or f"session_{datetime.now().timestamp()}"
+        session_id = request.session_id or f"session_{secrets.token_urlsafe(18)}"
+        try:
+            session_store.claim_session(session_id, user.uid)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        existing_task = session_tasks.get(session_id)
+        if existing_task is not None and not existing_task.done():
+            raise HTTPException(status_code=409, detail="This session is already processing a request")
         
         # Initialize session as not cancelled
         active_sessions[session_id] = False
@@ -530,6 +580,37 @@ async def process_chat(request: ChatRequest):
         ai_response = merged_state.get("ai_response", "")
         decision_type = merged_state.get("decision_type", "unknown")
 
+        # Preserve provenance from search results. LLM ranking output is not
+        # trusted to invent or relabel whether a product came from live data.
+        raw_results = merged_state.get("search_results", {}).get("results", [])
+        provenance_by_id = {
+            str(product.get("product_id")): product
+            for product in raw_results
+            if product.get("product_id") is not None
+        }
+        enriched_products = []
+        for product in ranked_products:
+            enriched = dict(product)
+            raw = provenance_by_id.get(str(product.get("product_id")), {})
+            enriched["source"] = raw.get("source", "unknown")
+            enriched["url"] = raw.get("url") or raw.get("product_url")
+            enriched_products.append(enriched)
+        ranked_products = enriched_products
+
+        recommendation = {
+            **decision_block,
+            "selected_option": selected_option,
+            "decision_type": decision_type,
+        }
+        quote = None
+        if ranked_products:
+            quote = session_store.create_quote(
+                session_id=session_id,
+                user_id=user.uid,
+                products=ranked_products,
+                recommendation=recommendation,
+            )
+
         # Clean up session from active sessions
         if session_id in active_sessions:
             del active_sessions[session_id]
@@ -542,15 +623,15 @@ async def process_chat(request: ChatRequest):
                 **comparison_block,
                 "ranked_products": ranked_products,
             },
-            "recommendation": {
-                **decision_block,
-                "selected_option": selected_option,
-                "decision_type": decision_type,
-            },
+            "recommendation": recommendation,
             "ai_response": ai_response,
-            "requires_confirmation": decision_type in ("confirm_with_user", "auto_buy"),
+            "requires_confirmation": quote is not None,
+            "quote_id": quote.quote_id if quote else None,
+            "quote_expires_at": datetime.fromtimestamp(quote.expires_at).isoformat() if quote else None,
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         await broadcast_agent_status(
             session_id,
@@ -560,80 +641,152 @@ async def process_chat(request: ChatRequest):
                 message=f"Error: {str(e)}"
             )
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Unable to process this request") from e
 
 @app.post("/api/order/confirm")
-async def confirm_order(request: OrderConfirmationRequest):
-    """
-    User confirms purchase - triggers Purchase Agent
-    """
+async def confirm_order(
+    request: OrderConfirmationRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Consume an exact server-side quote and execute only that selection."""
     try:
         session_id = request.session_id
-        
+        try:
+            session_store.assert_owner(session_id, user.uid)
+            quote, product = session_store.consume_quote(
+                quote_id=request.quote_id,
+                session_id=session_id,
+                user_id=user.uid,
+                selected_index=request.selected_product_index,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=404, detail="Quote not found") from exc
+        except TimeoutError as exc:
+            raise HTTPException(status_code=410, detail=str(exc)) from exc
+        except (ValueError, IndexError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
         # Broadcast: Purchase starting
         await broadcast_agent_status(
             session_id,
             AgentStatusUpdate(
                 step="purchase",
                 status="processing",
-                message="Adding to cart...",
-                data={"product_index": request.selected_product_index}
+                message="Validating confirmed quote...",
+                data={"product_index": request.selected_product_index, "quote_id": request.quote_id}
             )
         )
-        
-        # TODO: Call Purchase Agent here
-        # For now, simulate purchase
-        await asyncio.sleep(2)  # Simulate cart add
-        
-        await broadcast_agent_status(
-            session_id,
-            AgentStatusUpdate(
-                step="purchase",
-                status="processing",
-                message="Checking out..."
+
+        dry_run = os.getenv("GANGU_DRY_RUN", "true").strip().lower() == "true"
+        real_purchases_enabled = os.getenv("ENABLE_REAL_PURCHASES", "false").strip().lower() == "true"
+        source = str(product.get("source", "unknown"))
+        platform = str(product.get("platform", "Unknown"))
+
+        if dry_run:
+            order_id = f"DRY-RUN-{secrets.token_hex(6).upper()}"
+            result = {
+                "success": True,
+                "order_id": order_id,
+                "message": "Dry-run completed; no real order was placed",
+                "estimated_delivery": product.get("delivery_time_label") or product.get("delivery_time"),
+                "simulated": True,
+                "product": product,
+            }
+        elif not real_purchases_enabled:
+            raise HTTPException(status_code=503, detail="Real purchases are disabled by server policy")
+        elif source != "live_zepto_mcp":
+            raise HTTPException(
+                status_code=409,
+                detail="This product source does not support verified real checkout",
             )
-        )
-        
-        await asyncio.sleep(2)  # Simulate checkout
-        
+        elif not os.getenv("ZEPTO_DEFAULT_ADDRESS") or (
+            os.getenv("ZEPTO_DEFAULT_ADDRESS", "").strip().casefold()
+            != request.delivery_address.strip().casefold()
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Confirmed delivery address does not match the verified Zepto address",
+            )
+        elif request.payment_method != "cod":
+            raise HTTPException(status_code=409, detail="Verified Zepto checkout currently supports COD only")
+        else:
+            from agents.purchase_agent import execute_purchase
+
+            decision_input = {
+                "final_decision": {
+                    "selected_platform": platform,
+                    "product": {
+                        "name": product.get("item_name") or product.get("name"),
+                        "brand": product.get("brand"),
+                        "product_id": product.get("product_id"),
+                        "quantity": product.get("quantity", "1 unit"),
+                        "price": product.get("price", 0),
+                        "currency": product.get("currency", "INR"),
+                    },
+                    "delivery": {
+                        "delivery_date": "today",
+                        "slot": "standard",
+                        "address": request.delivery_address,
+                    },
+                    "fallback_options": [],
+                },
+                "user_context": {
+                    "user_id": user.uid,
+                    "payment_preference": request.payment_method,
+                    "delivery_address": request.delivery_address,
+                },
+            }
+            purchase_result = await asyncio.to_thread(execute_purchase, decision_input)
+            if purchase_result.get("purchase_status") != "success":
+                raise HTTPException(
+                    status_code=502,
+                    detail=purchase_result.get("user_message", "Platform did not confirm the order"),
+                )
+            execution = purchase_result.get("execution_details", {})
+            result = {
+                "success": True,
+                "order_id": execution.get("order_id"),
+                "message": purchase_result.get("user_message", "Order placed successfully"),
+                "estimated_delivery": purchase_result.get("order_confirmation", {}).get("delivery_time"),
+                "simulated": False,
+                "product": product,
+            }
+
         await broadcast_agent_status(
             session_id,
             AgentStatusUpdate(
                 step="purchase",
                 status="complete",
-                message="Order placed successfully! 🎉",
-                data={
-                    "order_id": f"ORD-{datetime.now().timestamp()}",
-                    "estimated_delivery": "Today by 7:00 PM"
-                }
+                message=result["message"],
+                data=result,
             )
         )
-        
-        return {
-            "success": True,
-            "order_id": f"ORD-{datetime.now().timestamp()}",
-            "message": "Order placed successfully",
-            "estimated_delivery": "Today by 7:00 PM"
-        }
-        
+        return result
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Unable to process the confirmed quote") from e
 
 @app.get("/api/session/{session_id}")
-async def get_session_data(session_id: str):
+async def get_session_data(
+    session_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
     """Retrieve session data for continuing conversation"""
     try:
+        session_store.assert_owner(session_id, user.uid)
         # TODO: Retrieve from MongoDB checkpointer
         return {
             "success": True,
             "session_id": session_id,
             "message": "Session data retrieved"
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except PermissionError as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
 
 @app.get("/api/history")
-async def get_order_history():
+async def get_order_history(user: AuthenticatedUser = Depends(get_current_user)):
     """Get user's order history (for personalization UI)"""
     try:
         # TODO: Retrieve from database
@@ -646,7 +799,10 @@ async def get_order_history():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/cancel")
-async def cancel_processing(request: CancelRequest):
+async def cancel_processing(
+    request: CancelRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
     """
     Cancel ongoing agent processing.
     Calls .cancel() on the running pipeline task so the long-running agents
@@ -655,6 +811,10 @@ async def cancel_processing(request: CancelRequest):
     """
     try:
         session_id = request.session_id
+        try:
+            session_store.assert_owner(session_id, user.uid)
+        except PermissionError as exc:
+            raise HTTPException(status_code=404, detail="Session not found") from exc
 
         # Cooperative flag (defence-in-depth in case the task hook is missed)
         active_sessions[session_id] = True

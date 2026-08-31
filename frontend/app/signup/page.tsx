@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader, Phone, Mail } from 'lucide-react'
+import { ArrowLeft, Loader } from 'lucide-react'
 import { signInWithPopup, signInWithPhoneNumber, ConfirmationResult, RecaptchaVerifier as FirebaseRecaptchaVerifier } from 'firebase/auth'
 import { auth, googleProvider } from '@/lib/firebase'
 import { useGANGUStore } from '@/lib/store'
@@ -49,9 +49,9 @@ export default function SignupPage() {
       }, await user.getIdToken())
 
       router.push('/app')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      setError(err.message || 'Failed to sign in with Google.')
+      setError(err instanceof Error ? err.message : 'Failed to sign in with Google.')
     } finally {
       setIsLoading(false)
     }
@@ -79,13 +79,13 @@ export default function SignupPage() {
       const confirmation = await signInWithPhoneNumber(auth, formattedNumber, appVerifier)
       setConfirmationResult(confirmation)
       setShowOTP(true)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
       setError('Failed to send SMS. Please ensure the phone number is correct.')
       // Reset recaptcha if failed
       if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.render().then((widgetId: any) => {
-          (window as any).grecaptcha.reset(widgetId);
+        window.recaptchaVerifier.render().then((widgetId: number) => {
+          window.grecaptcha?.reset(widgetId)
         });
       }
     } finally {
@@ -109,7 +109,7 @@ export default function SignupPage() {
       }, await user.getIdToken())
 
       router.push('/app')
-    } catch (err: any) {
+    } catch {
       throw new Error('Invalid OTP. Please try again.')
     }
   }
@@ -121,7 +121,7 @@ export default function SignupPage() {
       const appVerifier = window.recaptchaVerifier
       const confirmation = await signInWithPhoneNumber(auth, formattedNumber, appVerifier)
       setConfirmationResult(confirmation)
-    } catch (err: any) {
+    } catch (err: unknown) {
       throw err
     } finally {
       setIsLoading(false)
@@ -227,6 +227,7 @@ export default function SignupPage() {
 // Add types for global window variables
 declare global {
   interface Window {
-    recaptchaVerifier: any;
+    recaptchaVerifier: FirebaseRecaptchaVerifier
+    grecaptcha?: { reset: (widgetId: number) => void }
   }
 }

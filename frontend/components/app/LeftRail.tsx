@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useGANGUStore } from '@/lib/store'
 import Logo from '@/components/Logo'
+import { signOut as firebaseSignOut } from 'firebase/auth'
+import { auth as firebaseAuth } from '@/lib/firebase'
 import {
   Mic,
   Package,
@@ -31,9 +33,13 @@ export default function LeftRail() {
   const { user, settings, signOut } = useGANGUStore()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const handleSignOut = () => {
-    signOut()
-    router.push('/')
+  const handleSignOut = async () => {
+    try {
+      await firebaseSignOut(firebaseAuth)
+    } finally {
+      signOut()
+      router.push('/')
+    }
   }
 
   const initials = (user?.name || 'U')

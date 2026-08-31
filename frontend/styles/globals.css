@@ -363,3 +363,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #FB923C, #EA580C);
 }
+html.gangu-large-text {
+  font-size: 18px;
+}
+
+html.gangu-high-contrast body {
+  background: #000;
+  color: #fff;
+}
+
+html.gangu-high-contrast .surface-card,
+html.gangu-high-contrast .glass {
+  border-color: rgba(255, 255, 255, 0.42);
+  background-color: rgba(0, 0, 0, 0.96);
+}

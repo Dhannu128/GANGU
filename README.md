@@ -170,11 +170,11 @@ GANGU uses the **Model Context Protocol (MCP)** to talk to shopping platforms:
 
 | Client | File | Transport | Status |
 |---|---|---|---|
-| **Zepto** | `mcp_clients/zepto_mcp_client.py` | `stdio` (Playwright/Firefox) | ✅ Working — search + cart + checkout |
-| **Swiggy Instamart** | `mcp_clients/swiggy_mcp_client.py` | `SSE` over HTTP | ✅ Working — search only |
-| Amazon | `mcp_clients/amazon_mcp_client.py` | — | ⚠️ Stub — not implemented |
+| **Zepto** | `mcp_clients/zepto_mcp_client.py` | `stdio` (Playwright/Firefox) | Catalog/demo connector; not a verified production API |
+| **Swiggy Instamart** | `mcp_clients/swiggy_mcp_client.py` | `SSE` over HTTP | Client scaffold; live access pending Swiggy approval |
+| Amazon | `mcp_clients/amazon_mcp_client.py` | — | Stub — not implemented |
 
-The **Zepto MCP client** includes a built-in product URL catalog (onion, milk, dal, rice, bread, paneer, etc.) so it can look up product pages directly without an extra search step.
+The **Zepto connector** includes a built-in product URL catalog. Prices and availability are estimates unless a verified live connector supplies them, so the API defaults to dry-run and refuses to convert estimated results into real orders.
 
 ---
 
@@ -240,6 +240,7 @@ python start_gangu.py
 
 ```env
 # LLM — default model is set in agents/llm.py; override here if needed
+GEMINI_API_KEY=your_gemini_api_key
 LLM_MODEL=gemini-2.5-flash
 
 # LangSmith tracing (optional — set false to disable)
@@ -258,8 +259,13 @@ OPENAI_API_KEY=your_openai_api_key
 # MongoDB (LangGraph checkpointing)
 MONGODB_URI=mongodb://localhost:27017
 
-# Safety — KEEP TRUE during dev/testing, set false only in production
+# Firebase tokens are verified by the backend (fail-closed by default)
+GANGU_AUTH_REQUIRED=true
+FIREBASE_PROJECT_ID=gangu-adffd
+
+# Safety — both switches are required before any real transaction is possible
 GANGU_DRY_RUN=true
+ENABLE_REAL_PURCHASES=false
 ```
 
 ### Frontend `frontend/.env.local`
@@ -293,15 +299,19 @@ All `/app/*` routes are inside the `(authenticated)` route group and auto-redire
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/chat/process` | Run the full agent pipeline on a user message |
-| `POST` | `/api/order/confirm` | Confirm a pending order (when agent asks for confirmation) |
+| `POST` | `/api/order/confirm` | Consume a one-time server quote and confirm the selected product |
+| `POST` | `/api/auth/ws-ticket` | Issue an authenticated, single-use WebSocket ticket |
+| `POST` | `/api/auth/swiggy/start` | Start authenticated Swiggy OAuth with PKCE |
+| `GET` | `/api/auth/callback/swiggy` | Exact public Swiggy OAuth redirect path |
 | `POST` | `/api/cancel` | Cancel an in-flight pipeline run |
 | `POST` | `/api/voice/whisper` | Transcribe voice audio via OpenAI Whisper |
 | `GET` | `/api/session/{id}` | Fetch current session state |
 | `GET` | `/api/history` | Fetch order history |
-| `WS` | `/ws/{session_id}` | WebSocket for live agent step updates (used by agent timeline) |
-| `POST` | `/api/auth/otp/request` | Auth stub — mocked in frontend |
-| `POST` | `/api/auth/otp/verify` | Auth stub — mocked in frontend |
-| `POST` | `/api/auth/social` | Auth stub — Google/WhatsApp (mocked in frontend) |
+| `WS` | `/ws/{session_id}` | Session-scoped agent updates; requires a short-lived ticket |
+
+For local development, `GANGU_STATE_BACKEND=memory` keeps session and OAuth state in-process. Production deployments should use `GANGU_STATE_BACKEND=mongodb`; this makes session ownership and one-time quotes safe across workers and stores Swiggy OAuth tokens encrypted with `SWIGGY_TOKEN_ENCRYPTION_KEY`.
+
+The exact redirect URI to send Swiggy is your deployed API origin plus `/api/auth/callback/swiggy`, for example `https://api.example.com/api/auth/callback/swiggy`. The same full value must be configured in `SWIGGY_REDIRECT_URI`.
 
 ---
 
@@ -343,7 +353,7 @@ All `/app/*` routes are inside the `(authenticated)` route group and auto-redire
 ## Key Design Decisions
 
 **Why LangGraph?**
-LangGraph gives fine-grained control over the pipeline. Each agent is a named **graph node** and routing between them uses **conditional edges** (buy-intent → full search pipeline; info-intent → query handler). MongoDB checkpointing lets sessions survive failures and be resumed.
+LangGraph gives fine-grained control over the pipeline. Each agent is a named **graph node** and routing between them uses **conditional edges** (buy-intent → full search pipeline; info-intent → query handler). MongoDB-backed production persistence is still planned; the current quote/session store is single-process.
 
 **Why a random key pool in `llm.py`?**
 Gemini free-tier keys have per-minute rate limits. By randomly selecting from a pool of 6 keys, GANGU handles more concurrent requests without throttling.
@@ -352,14 +362,15 @@ Gemini free-tier keys have per-minute rate limits. By randomly selecting from a 
 Zepto has no public API. The Zepto MCP client uses Playwright to automate Firefox — navigate the site, search, add to cart, checkout — exactly like a human. This is wrapped as an MCP server so agents call it as a tool.
 
 **Why `GANGU_DRY_RUN`?**
-The Purchase Agent checks this flag before placing any real order. When `true`, it logs the intent but never submits to Zepto. Always keep this `true` during development.
+The confirmation endpoint checks this flag before any platform call. When `true`, it returns an explicitly labelled dry-run result. A real transaction additionally requires `ENABLE_REAL_PURCHASES=true`, a verified live-data source, authentication, and a valid one-time quote.
 
 ---
 
 ## Dev Tips
 
-- **Dev OTP:** `123456` works for any phone number (frontend mock)
+- **Local auth bypass:** only set `GANGU_AUTH_REQUIRED=false` explicitly for isolated development/testing
 - **TypeScript check:** `cd frontend && npx tsc --noEmit`
+- **Backend safety tests:** `python -m pytest -q`
 - **Reset auth state:** Clear the `gangu-store` key in browser localStorage
 - **Cancel a pipeline:** The agent timeline has a **Cancel** button while running
 - **Add a new platform:** Copy `mcp_clients/zepto_mcp_client.py` as a template; register it in `agents/search_agent.py`
@@ -372,18 +383,20 @@ The Purchase Agent checks this flag before placing any real order. When `true`, 
 
 ### ✅ Shipped
 - All 6 agents + notification + query_info graph nodes
-- Zepto MCP client (search + cart + checkout via Playwright)
-- Swiggy Instamart MCP client (search via SSE)
-- LangGraph orchestration with conditional routing + MongoDB checkpointing
+- LangGraph orchestration with conditional routing
 - FastAPI backend (REST + WebSocket)
+- Backend Firebase token verification and session-scoped WebSockets
+- One-time quote → explicit confirmation transaction boundary
 - Next.js frontend: landing · auth · workspace · 4 sub-routes
 - Investor-ready landing (aurora hero · trust strip · comparison matrix · mobile drawer)
-- Social auth (Google + WhatsApp, mocked in dev)
+- Firebase Google and phone authentication in the active sign-in route
 - Settings draft/save UX with toasts
 - Idle "breathing" mic animation + global toast system
 
 ### ⚠️ Not Yet / Stubs
-- Real `/api/auth/*` endpoints — frontend mocks them (`123456` works in dev)
+- Durable MongoDB/Redis persistence for sessions, quotes, orders, and idempotency
+- Swiggy live MCP credentials and OAuth redirect flow (awaiting Swiggy approval)
+- Zepto live MCP checkout; current catalog data is labelled as estimated
 - Backend persistence for family members + saved lists (localStorage only)
 - Amazon MCP client (`amazon_mcp_client.py` is an empty stub)
 - BigBasket / JioMart / Dunzo MCP clients

@@ -1,11 +1,39 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { Mic, MicOff, Languages } from 'lucide-react'
 import { useGANGUStore } from '@/lib/store'
 
 interface VoiceInputProps {
   onTranscription: (text: string) => void
+}
+
+interface SpeechRecognitionEventLike {
+  resultIndex: number
+  results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>
+}
+
+interface SpeechRecognitionErrorLike { error: string }
+interface SpeechRecognitionLike {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  maxAlternatives: number
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onerror: ((event: SpeechRecognitionErrorLike) => void) | null
+  onend: (() => void) | null
+  start(): void
+  stop(): void
+}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
+
+function speechRecognitionConstructor(): SpeechRecognitionConstructor | undefined {
+  if (typeof window === 'undefined') return undefined
+  const speechWindow = window as typeof window & {
+    SpeechRecognition?: SpeechRecognitionConstructor
+    webkitSpeechRecognition?: SpeechRecognitionConstructor
+  }
+  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition
 }
 
 // Web Speech API runs entirely in the user's browser — no audio upload,
@@ -14,24 +42,13 @@ interface VoiceInputProps {
 // SpeechRecognition; users on Firefox will see "voice not supported" and
 // can fall back to the text input.
 export default function VoiceInput({ onTranscription }: VoiceInputProps) {
-  const { isListening, setListening, transcription, setTranscription, isProcessing } = useGANGUStore()
-  const [isSupported, setIsSupported] = useState(false)
-  const recognitionRef = useRef<any>(null)
+  const { isListening, setListening, transcription, setTranscription, isProcessing, settings } = useGANGUStore()
+  const [isSupported] = useState(() => Boolean(speechRecognitionConstructor()))
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const finalTextRef = useRef<string>('')
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const SR =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition
-    setIsSupported(!!SR)
-  }, [])
-
   const startListening = () => {
-    if (typeof window === 'undefined') return
-    const SR =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition
+    const SR = speechRecognitionConstructor()
     if (!SR) {
       alert('Voice input is not supported in this browser. Please use Chrome or Edge.')
       return
@@ -42,12 +59,12 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
 
     const recognition = new SR()
     // hi-IN handles Hindi + Roman-script English / Hinglish on Chrome.
-    recognition.lang = 'hi-IN'
+    recognition.lang = settings.language === 'en' ? 'en-IN' : 'hi-IN'
     recognition.continuous = false
     recognition.interimResults = true
     recognition.maxAlternatives = 1
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       let interim = ''
       let final = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -63,7 +80,7 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
       }
     }
 
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event: SpeechRecognitionErrorLike) => {
       console.error('Speech recognition error:', event.error)
       if (event.error === 'no-speech') {
         // benign — user tapped mic but didn't speak

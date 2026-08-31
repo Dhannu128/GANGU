@@ -115,7 +115,7 @@ export default function Home() {
         <div className="relative text-center max-w-4xl mx-auto animate-fade-in">
           <span className="pill-amber mb-7 mx-auto inline-flex">
             <Sparkles className="w-3.5 h-3.5" />
-            India's first voice-first grocery assistant
+            India&apos;s first voice-first grocery assistant
           </span>
 
           <h1 className="text-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl mb-7 leading-[0.95]">
@@ -166,7 +166,7 @@ export default function Home() {
       {/* PLATFORMS MARQUEE */}
       <section className="relative border-y border-white/5 bg-white/[0.012] py-7 overflow-hidden">
         <p className="text-center text-[11px] text-slate-500 uppercase tracking-[0.25em] font-bold mb-5">
-          Searches across India's top grocery platforms
+          Searches across India&apos;s top grocery platforms
         </p>
         <div className="relative">
           <div className="flex marquee-track gap-14 whitespace-nowrap font-display text-2xl md:text-3xl font-bold text-slate-700">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useGANGUStore, type Language, type Settings } from '@/lib/store'
 import {
   Settings as SettingsIcon,
@@ -20,14 +20,6 @@ export default function SettingsPage() {
 
   const [draft, setDraft] = useState<Settings>(settings)
   const [draftName, setDraftName] = useState(user?.name ?? '')
-
-  useEffect(() => {
-    setDraft(settings)
-  }, [settings])
-
-  useEffect(() => {
-    setDraftName(user?.name ?? '')
-  }, [user?.name])
 
   const isDirty = useMemo(() => {
     return (

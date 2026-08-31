@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useGANGUStore } from '@/lib/store'
 
 interface GreetingProps {
@@ -28,9 +29,9 @@ export default function Greeting({ onReorder }: GreetingProps) {
   const greetingEn = EN_GREETINGS(hour)
 
   const lastOrder = pastOrders[0]
-  const daysAgo = lastOrder
-    ? Math.max(0, Math.floor((Date.now() - new Date(lastOrder.date).getTime()) / 86400000))
-    : null
+  const daysAgo = useMemo(() => lastOrder
+    ? Math.max(0, Math.floor((new Date().getTime() - new Date(lastOrder.date).getTime()) / 86400000))
+    : null, [lastOrder])
 
   let salutation: string
   if (lang === 'hi') {

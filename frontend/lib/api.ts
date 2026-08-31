@@ -14,15 +14,28 @@ const api = axios.create({
   },
 })
 
+api.interceptors.request.use((config) => {
+  const token = useGANGUStore.getState().auth.token
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
 // === WebSocket ===
 let ws: WebSocket | null = null
 
-export const connectWebSocket = (sessionId: string) => {
+export const connectWebSocket = async (sessionId: string) => {
   const store = useGANGUStore.getState()
 
   if (ws && ws.readyState === WebSocket.OPEN) return ws
 
-  ws = new WebSocket(`${WS_BASE_URL}/ws/${sessionId}`)
+  try {
+    const ticketResponse = await api.post('/api/auth/ws-ticket')
+    const ticket = encodeURIComponent(ticketResponse.data.ticket)
+    ws = new WebSocket(`${WS_BASE_URL}/ws/${sessionId}?ticket=${ticket}`)
+  } catch {
+    store.setConnected(false)
+    return null
+  }
 
   ws.onopen = () => {
     store.setConnected(true)
@@ -72,10 +85,19 @@ export const processUserInput = async (
   return response.data
 }
 
-export const confirmOrder = async (sessionId: string, productIndex: number) => {
+export const confirmOrder = async (
+  sessionId: string,
+  quoteId: string,
+  productIndex: number,
+  deliveryAddress: string,
+  paymentMethod: 'upi' | 'cod' | 'card',
+) => {
   const response = await api.post('/api/order/confirm', {
     session_id: sessionId,
+    quote_id: quoteId,
     selected_product_index: productIndex,
+    delivery_address: deliveryAddress,
+    payment_method: paymentMethod,
   })
   return response.data
 }

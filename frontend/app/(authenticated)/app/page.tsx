@@ -14,6 +14,26 @@ import TodayPanel from '@/components/app/TodayPanel'
 import QuickReorder from '@/components/app/QuickReorder'
 import EmptyState from '@/components/app/EmptyState'
 
+interface RawProduct {
+  name?: string
+  brand?: string
+  platform: string
+  price?: number
+  delivery_time?: string
+  rating?: number
+  stock_status?: string
+  image?: string
+  url?: string
+  product_identity?: { canonical_name?: string; original_name?: string; brand?: string }
+  normalized_attributes?: {
+    price?: number
+    delivery_time_label?: string
+    rating?: number
+    availability?: boolean
+  }
+  [key: string]: unknown
+}
+
 export default function AppHome() {
   const {
     sessionId,
@@ -26,10 +46,12 @@ export default function AppHome() {
     pastOrders,
     isProcessing,
     agentSteps,
+    settings,
   } = useGANGUStore()
 
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [selectedProductIndex, setSelectedProductIndex] = useState(0)
+  const [quoteId, setQuoteId] = useState<string | null>(null)
 
   // Abort controller for the in-flight chat/process request, so cancel can
   // tear down the HTTP request immediately instead of waiting for the
@@ -62,7 +84,7 @@ export default function AppHome() {
           result.comparison?.ranked_products ||
           result.comparison?.products ||
           []
-        const products = rawProducts.map((p: any) => ({
+        const products = rawProducts.map((p: RawProduct) => ({
           ...p,
           name:
             p.name ||
@@ -96,14 +118,16 @@ export default function AppHome() {
         }
         setComparison(normalizedComparison)
         setRecommendation(normalizedRecommendation)
+        setQuoteId(result.quote_id || null)
 
         if (result.requires_confirmation && products.length > 0) {
           setSelectedProductIndex(recommendedIndex)
           setShowConfirmation(true)
         }
       }
-    } catch (error: any) {
-      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED' || controller.signal.aborted) {
+    } catch (error: unknown) {
+      const cancellation = error as { name?: string; code?: string }
+      if (cancellation?.name === 'CanceledError' || cancellation?.code === 'ERR_CANCELED' || controller.signal.aborted) {
         // Cancelled by user — silent, store already updated by handleCancel.
       } else {
         console.error('Error processing input:', error)
@@ -120,10 +144,16 @@ export default function AppHome() {
 
   const handleConfirmOrder = async () => {
     try {
-      if (!sessionId) return
-      const result = await confirmOrder(sessionId, selectedProductIndex)
+      if (!sessionId || !quoteId) return
+      const result = await confirmOrder(
+        sessionId,
+        quoteId,
+        selectedProductIndex,
+        settings.address,
+        settings.paymentMethod,
+      )
       if (result.success) {
-        setOrderPlaced(true, result.order_id)
+        setOrderPlaced(true, result.order_id, result.simulated === true)
         setShowConfirmation(false)
       }
     } catch (error) {
@@ -134,6 +164,7 @@ export default function AppHome() {
 
   const handleNewOrder = () => {
     resetSession()
+    setQuoteId(null)
   }
 
   const handleReorderLast = () => {
@@ -171,6 +202,10 @@ export default function AppHome() {
             <ProductComparison
               onSelectProduct={(index) => {
                 setSelectedProductIndex(index)
+                setRecommendation({
+                  ...(useGANGUStore.getState().recommendation ?? {}),
+                  selected_index: index,
+                })
                 setShowConfirmation(true)
               }}
             />
@@ -189,6 +224,7 @@ export default function AppHome() {
 
       {showConfirmation && (
         <OrderConfirmation
+          selectedProductIndex={selectedProductIndex}
           onConfirm={handleConfirmOrder}
           onCancel={() => setShowConfirmation(false)}
           onChangeSelection={() => setShowConfirmation(false)}

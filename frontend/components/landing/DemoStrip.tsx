@@ -106,7 +106,6 @@ export default function DemoStrip() {
               {AGENTS.map((a, i) => {
                 const isComplete = cur.agentIndex > i
                 const isActive = cur.agentIndex === i
-                const isPending = cur.agentIndex < i
                 const Icon = a.icon
                 return (
                   <div

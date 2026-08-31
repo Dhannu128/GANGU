@@ -38,6 +38,15 @@ export default function ProductComparison({ onSelectProduct }: ProductComparison
             <article
               key={index}
               onClick={() => onSelectProduct(index)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  onSelectProduct(index)
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Choose ${product.name} from ${product.platform} for ₹${product.price}`}
               className={`product-card ${isRecommended ? 'recommended' : ''}`}
             >
               {/* Recommended badge */}

@@ -19,19 +19,23 @@ export default function OTPModal({ isOpen, onClose, onVerify, phoneNumber, resen
   const [countdown, setCountdown] = useState(30)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  // Reset state when opened
+  // Focus after the opening animation; state is reset by the close action.
   useEffect(() => {
     if (isOpen) {
-      setOtp(['', '', '', '', '', ''])
-      setError('')
-      setCountdown(30)
-      setIsVerifying(false)
-      // Focus first input
-      setTimeout(() => {
+      const focusTimer = setTimeout(() => {
         if (inputRefs.current[0]) inputRefs.current[0].focus()
       }, 100)
+      return () => clearTimeout(focusTimer)
     }
   }, [isOpen])
+
+  const handleClose = () => {
+    setOtp(['', '', '', '', '', ''])
+    setError('')
+    setCountdown(30)
+    setIsVerifying(false)
+    onClose()
+  }
 
   // Countdown timer
   useEffect(() => {
@@ -77,8 +81,8 @@ export default function OTPModal({ isOpen, onClose, onVerify, phoneNumber, resen
     setError('')
     try {
       await onVerify(code)
-    } catch (err: any) {
-      setError(err.message || 'Invalid code. Please try again.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Invalid code. Please try again.')
     } finally {
       setIsVerifying(false)
     }
@@ -93,7 +97,7 @@ export default function OTPModal({ isOpen, onClose, onVerify, phoneNumber, resen
     
     try {
       await resendOTP()
-    } catch (err: any) {
+    } catch {
       setError('Failed to resend. Please try again.')
     }
   }
@@ -107,7 +111,7 @@ export default function OTPModal({ isOpen, onClose, onVerify, phoneNumber, resen
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-ink-950/80 backdrop-blur-sm"
-            onClick={onClose}
+            onClick={handleClose}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
             <motion.div
@@ -117,7 +121,7 @@ export default function OTPModal({ isOpen, onClose, onVerify, phoneNumber, resen
               className="surface-card w-full max-w-md p-8 relative pointer-events-auto"
             >
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white bg-white/5 rounded-full transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -169,7 +173,7 @@ export default function OTPModal({ isOpen, onClose, onVerify, phoneNumber, resen
               </button>
 
               <div className="text-center text-sm text-slate-400">
-                Didn't receive the code?{' '}
+                Didn&apos;t receive the code?{' '}
                 <button
                   onClick={handleResend}
                   disabled={countdown > 0}

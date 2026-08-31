@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { useGANGUStore } from '@/lib/store'
 import { connectWebSocket, disconnectWebSocket } from '@/lib/api'
@@ -9,6 +9,8 @@ import MobileNav from './MobileNav'
 import Logo from '@/components/Logo'
 import Link from 'next/link'
 import { Loader } from 'lucide-react'
+import { onIdTokenChanged } from 'firebase/auth'
+import { auth as firebaseAuth } from '@/lib/firebase'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -16,32 +18,64 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const router = useRouter()
-  const { auth, setSessionId, sessionId } = useGANGUStore()
-  const [hydrated, setHydrated] = useState(false)
+  const { auth, setSessionId, sessionId, settings } = useGANGUStore()
+  const hydrated = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  )
+  const [authReady, setAuthReady] = useState(false)
 
   useEffect(() => {
-    setHydrated(true)
-  }, [])
+    document.documentElement.classList.toggle('gangu-large-text', settings.largerText)
+    document.documentElement.classList.toggle('gangu-high-contrast', settings.higherContrast)
+    return () => {
+      document.documentElement.classList.remove('gangu-large-text', 'gangu-high-contrast')
+    }
+  }, [settings.largerText, settings.higherContrast])
+
+  useEffect(() => onIdTokenChanged(firebaseAuth, async (firebaseUser) => {
+    const store = useGANGUStore.getState()
+    if (!firebaseUser) {
+      store.signOut()
+      setAuthReady(true)
+      return
+    }
+    const existing = store.user
+    store.signIn({
+      id: firebaseUser.uid,
+      name: firebaseUser.displayName || existing?.name || 'User',
+      phone: firebaseUser.phoneNumber || existing?.phone || '',
+      email: firebaseUser.email || existing?.email,
+      photoURL: firebaseUser.photoURL || existing?.photoURL,
+      language: existing?.language || 'hinglish',
+      address: existing?.address || 'Please set your delivery address in settings',
+    }, await firebaseUser.getIdToken())
+    setAuthReady(true)
+  }, () => {
+    useGANGUStore.getState().signOut()
+    setAuthReady(true)
+  }), [])
 
   useEffect(() => {
-    if (!hydrated) return
+    if (!hydrated || !authReady) return
     if (!auth.isAuthenticated) {
       router.replace('/signin')
     }
-  }, [hydrated, auth.isAuthenticated, router])
+  }, [hydrated, authReady, auth.isAuthenticated, router])
 
   useEffect(() => {
-    if (!hydrated || !auth.isAuthenticated) return
+    if (!hydrated || !authReady || !auth.isAuthenticated) return
     const id = sessionId || `session_${Date.now()}`
     if (!sessionId) setSessionId(id)
-    connectWebSocket(id)
+    void connectWebSocket(id)
     return () => {
       disconnectWebSocket()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, auth.isAuthenticated])
+  }, [hydrated, authReady, auth.isAuthenticated])
 
-  if (!hydrated) {
+  if (!hydrated || !authReady) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader className="w-6 h-6 text-amber-300 animate-spin" />

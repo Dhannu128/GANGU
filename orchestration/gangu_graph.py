@@ -431,12 +431,19 @@ def decision_agent(state: GANGUState) -> GANGUState:
 # ==================== AGENT 6: PURCHASE EXECUTION (SIMULATED) ====================
 def purchase_agent(state: GANGUState) -> GANGUState:
     """
-    Purchase Execution Agent - Now integrated with real purchase agent for Zepto COD
+    Prepare a purchase proposal. Execution is intentionally handled only by
+    the authenticated /api/order/confirm endpoint after an exact quote is
+    selected by the user.
     """
-    print("\n💳 [Agent 6] Purchase Execution Agent (Real Implementation)")
+    print("\n💳 [Agent 6] Purchase Proposal Agent")
     
     decision_type = state.get("decision_type", "unknown")
     selected_option = state.get("selected_option")
+
+    if selected_option:
+        state["purchase_status"] = "pending_confirmation"
+        print("   ✓ Purchase proposal prepared; explicit user confirmation required")
+        return state
     
     # Check if we should actually purchase
     if decision_type == "auto_buy":

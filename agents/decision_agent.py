@@ -1124,8 +1124,6 @@ def create_fallback_decision(comparison_results: Dict[str, Any]) -> Dict[str, An
 
 def make_decision(comparison_results: Dict[str, Any]) -> Dict[str, Any]:
     """REAL AGENTIC SYSTEM - Main decision function with transparent failures"""
-    global chat_history
-    
     # FIRST: Check for upstream failures (NO FALLBACK)
     failure_check = make_decision_with_transparent_failure(comparison_results)
     if failure_check.get("status") == "failed":
@@ -1142,12 +1140,14 @@ def make_decision(comparison_results: Dict[str, Any]) -> Dict[str, Any]:
             comparison_json = json.dumps(comparison_results, ensure_ascii=False, indent=2)
             
             # Add user message to history
-            chat_history.append({"role": "user", "parts": [{"text": comparison_json}]})
+            request_history = chat_history[:2] + [
+                {"role": "user", "parts": [{"text": comparison_json}]}
+            ]
             
             # Call Gemini API
             response = client.models.generate_content(
                 model=MODEL_NAME,
-                contents=chat_history,
+                contents=request_history,
                 config={
                     "temperature": 0.2,
                     "top_p": 0.95,
@@ -1182,8 +1182,6 @@ def make_decision(comparison_results: Dict[str, Any]) -> Dict[str, Any]:
         response_text = response.text
         
         # Add model response to history
-        chat_history.append({"role": "model", "parts": [{"text": response_text}]})
-        
         # Clean and parse JSON
         cleaned_response = clean_json_response(response_text)
         parsed_output = json.loads(cleaned_response)

@@ -674,19 +674,18 @@ def create_action_plan(intent_output: dict) -> dict:
     Main function to create action plan from intent output.
     Returns structured action plan JSON.
     """
-    global chat_history
-    
     try:
         # Convert intent output to string for the model
         intent_json = json.dumps(intent_output, ensure_ascii=False)
         
         # Add user message to history
-        chat_history.append({"role": "user", "parts": [{"text": intent_json}]})
+        request_history = chat_history[:2]
+        request_history.append({"role": "user", "parts": [{"text": intent_json}]})
         
         # Call the new API
         response = client.models.generate_content(
             model=MODEL_NAME,
-            contents=chat_history,
+            contents=request_history,
             config={
                 "temperature": 0.2,  # Low temperature for consistent planning
                 "top_p": 0.95,
@@ -698,8 +697,6 @@ def create_action_plan(intent_output: dict) -> dict:
         response_text = response.text
         
         # Add model response to history
-        chat_history.append({"role": "model", "parts": [{"text": response_text}]})
-        
         cleaned_response = clean_json_response(response_text)
         parsed_output = json.loads(cleaned_response)
         return parsed_output

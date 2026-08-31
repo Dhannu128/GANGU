@@ -88,7 +88,7 @@ export default function AgentTimeline() {
 
         {/* Skeleton preview */}
         <div className="space-y-2.5 mt-6">
-          {STEP_ORDER.slice(0, 4).map((s, i) => {
+          {STEP_ORDER.slice(0, 4).map((s) => {
             const meta = STEP_META[s]
             const Icon = meta.icon
             return (

@@ -21,7 +21,7 @@ export default function EmptyState({ onTry }: EmptyStateProps) {
         className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl border border-amber-500/40 bg-amber-500/[0.06] hover:bg-amber-500/[0.10] transition-all group"
       >
         <Mic className="w-5 h-5 text-amber-300 group-hover:scale-110 transition-transform" />
-        <span className="text-amber-100 font-semibold">"{SAMPLE}"</span>
+        <span className="text-amber-100 font-semibold">&ldquo;{SAMPLE}&rdquo;</span>
       </button>
     </div>
   )

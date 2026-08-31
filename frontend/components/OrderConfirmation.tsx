@@ -5,20 +5,21 @@ import { useState } from 'react'
 import { Check, X, Edit3, ShieldCheck, Truck, Sparkles, Loader } from 'lucide-react'
 
 interface OrderConfirmationProps {
+  selectedProductIndex: number
   onConfirm: () => void
   onCancel: () => void
   onChangeSelection: () => void
 }
 
-export default function OrderConfirmation({ onConfirm, onCancel, onChangeSelection }: OrderConfirmationProps) {
-  const { comparison, recommendation } = useGANGUStore()
+export default function OrderConfirmation({ selectedProductIndex, onConfirm, onCancel, onChangeSelection }: OrderConfirmationProps) {
+  const { comparison, recommendation, settings } = useGANGUStore()
   const [loading, setLoading] = useState(false)
 
   if (!comparison || !comparison.products || comparison.products.length === 0) return null
 
-  const selectedIndex = recommendation?.selected_index ?? comparison.recommended_index ?? 0
-  const selectedProduct = comparison.products[selectedIndex]
+  const selectedProduct = comparison.products[selectedProductIndex]
   if (!selectedProduct) return null
+  const isLiveProduct = selectedProduct.source === 'live_zepto_mcp'
 
   const handleConfirm = async () => {
     setLoading(true)
@@ -95,6 +96,10 @@ export default function OrderConfirmation({ onConfirm, onCancel, onChangeSelecti
               </div>
             )}
           </div>
+          <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
+            <p className="text-xs text-slate-300"><strong>Deliver to:</strong> {settings.address}</p>
+            <p className="text-xs text-slate-300"><strong>Payment:</strong> {settings.paymentMethod.toUpperCase()}</p>
+          </div>
         </div>
 
         {/* Reasoning */}
@@ -110,7 +115,11 @@ export default function OrderConfirmation({ onConfirm, onCancel, onChangeSelecti
         {/* Trust line */}
         <p className="text-xs text-slate-500 text-center mb-5 inline-flex items-center gap-1.5 justify-center w-full">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          You'll be charged on <strong className="text-slate-300 mx-1">{selectedProduct.platform}</strong> only after confirming.
+          {isLiveProduct ? (
+            <>You&apos;ll be charged on <strong className="text-slate-300 mx-1">{selectedProduct.platform}</strong> only after confirming.</>
+          ) : (
+            <>Estimated/mock data: confirmation runs a safe demo and places no real order.</>
+          )}
         </p>
 
         {/* Actions */}
@@ -124,7 +133,7 @@ export default function OrderConfirmation({ onConfirm, onCancel, onChangeSelecti
             ) : (
               <>
                 <Check className="w-5 h-5" strokeWidth={3} />
-                Confirm purchase
+                {isLiveProduct ? 'Confirm purchase' : 'Run safe demo'}
               </>
             )}
           </button>

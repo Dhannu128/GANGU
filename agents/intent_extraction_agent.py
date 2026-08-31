@@ -287,19 +287,18 @@ def extract_intent(user_input: str) -> dict:
     Main function to extract intent from user input.
     Returns structured JSON output.
     """
-    global chat_history
-    
     # Try fallback parser first if API might be rate-limited
     fallback = simple_fallback_parser(user_input)
+    request_history = chat_history[:2]
     
     try:
         # Add user message to history
-        chat_history.append({"role": "user", "parts": [{"text": user_input}]})
+        request_history.append({"role": "user", "parts": [{"text": user_input}]})
         
         # Call the new API
         response = client.models.generate_content(
             model=MODEL_NAME,
-            contents=chat_history,
+            contents=request_history,
             config={
                 "temperature": 0.1,  # Low temperature for consistent extraction
                 "top_p": 0.95,
@@ -311,8 +310,6 @@ def extract_intent(user_input: str) -> dict:
         response_text = response.text
         
         # Add model response to history
-        chat_history.append({"role": "model", "parts": [{"text": response_text}]})
-        
         cleaned_response = clean_json_response(response_text)
         parsed_output = json.loads(cleaned_response)
         return parsed_output

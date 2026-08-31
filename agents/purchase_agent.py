@@ -58,7 +58,7 @@ MAX_RETRY_ATTEMPTS = 3
 RETRY_DELAY_SECONDS = 2
 
 # Dry run mode (for testing)
-DRY_RUN_MODE = os.environ.get('GANGU_DRY_RUN', 'false').lower() == 'true'
+DRY_RUN_MODE = os.environ.get('GANGU_DRY_RUN', 'true').lower() == 'true'
 
 # Order history for idempotency (in-memory for now)
 order_history = {}
@@ -1164,7 +1164,11 @@ def execute_purchase(decision_input: Dict[str, Any]) -> Dict[str, Any]:
     print(f"📊 Quantity: {quantity}")
     
     # Check for duplicate order (idempotency)
-    order_hash = generate_order_hash(selected_platform, product_id)
+    order_hash = generate_order_hash(
+        selected_platform,
+        product_id,
+        str(user_context.get("user_id", "default_user")),
+    )
     if order_hash in order_history:
         print(f"\n⚠️ DUPLICATE ORDER DETECTED!")
         existing_order = order_history[order_hash]
@@ -1416,11 +1420,10 @@ def purchase_with_ai_reasoning(decision_input: Dict[str, Any]) -> Dict[str, Any]
     AI-enhanced purchase execution with reasoning
     (For complex edge cases)
     """
-    global chat_history
-    
     try:
         # Add decision input to chat
-        chat_history.append({
+        request_history = chat_history[:2]
+        request_history.append({
             "role": "user",
             "parts": [{"text": f"Execute purchase for this decision:\n{json.dumps(decision_input, indent=2)}"}]
         })
@@ -1428,7 +1431,7 @@ def purchase_with_ai_reasoning(decision_input: Dict[str, Any]) -> Dict[str, Any]
         # Call AI model
         response = client.models.generate_content(
             model=MODEL_NAME,
-            contents=chat_history,
+            contents=request_history,
             config={
                 "temperature": 0.2,  # Low temperature for deterministic execution
                 "top_p": 0.95,
@@ -1437,8 +1440,6 @@ def purchase_with_ai_reasoning(decision_input: Dict[str, Any]) -> Dict[str, Any]
         )
         
         response_text = response.text
-        chat_history.append({"role": "model", "parts": [{"text": response_text}]})
-        
         # Parse AI response
         # (In production, AI would return structured JSON)
         # For now, use deterministic function

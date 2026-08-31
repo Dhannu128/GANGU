@@ -8,7 +8,7 @@ interface SuccessScreenProps {
 }
 
 export default function SuccessScreen({ onNewOrder }: SuccessScreenProps) {
-  const { orderId, comparison, recommendation } = useGANGUStore()
+  const { orderId, orderSimulated, comparison, recommendation } = useGANGUStore()
   if (!orderId) return null
 
   const selectedProduct = comparison?.products[recommendation?.selected_index || 0]
@@ -53,13 +53,17 @@ export default function SuccessScreen({ onNewOrder }: SuccessScreenProps) {
 
         <span className="pill-emerald mb-4 mx-auto">
           <Sparkles className="w-3 h-3" />
-          Order placed
+          {orderSimulated ? 'Safe demo completed' : 'Order placed'}
         </span>
 
         <h2 className="text-display text-3xl md:text-4xl mb-2">
-          You're all set!
+          {orderSimulated ? 'No real order was placed' : "You're all set!"}
         </h2>
-        <p className="text-slate-400 mb-7">Your groceries are on the way.</p>
+        <p className="text-slate-400 mb-7">
+          {orderSimulated
+            ? 'This was a dry-run using estimated or mock product data.'
+            : 'Your groceries are on the way.'}
+        </p>
 
         {/* Order details */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 mb-6 text-left space-y-3">
@@ -108,10 +112,12 @@ export default function SuccessScreen({ onNewOrder }: SuccessScreenProps) {
             <RotateCcw className="w-4 h-4" />
             Order something else
           </button>
-          <button className="btn-secondary w-full">
-            <Package className="w-4 h-4" />
-            Track this order
-          </button>
+          {!orderSimulated && (
+            <button className="btn-secondary w-full">
+              <Package className="w-4 h-4" />
+              Track this order
+            </button>
+          )}
         </div>
 
         <p className="mt-6 text-sm text-slate-500">

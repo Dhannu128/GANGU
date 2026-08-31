@@ -13,12 +13,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
-      - key: TOKENROUTER_API_KEY
-        sync: false            # paste in Render dashboard, never commit
-      - key: TOKENROUTER_BASE_URL
-        value: https://api.tokenrouter.com/v1
+      - key: GEMINI_API_KEY
+        sync: false
       - key: LLM_MODEL
-        value: claude-haiku-4-5
+        value: gemini-2.5-flash
       - key: OPENAI_API_KEY
         sync: false            # only needed for Whisper voice transcription
       - key: LANGSMITH_TRACING
@@ -29,5 +27,19 @@ services:
         value: GANGU
       - key: FRONTEND_URLS
         sync: false            # set to your Vercel URL(s), comma-separated
+      - key: FIREBASE_PROJECT_ID
+        value: gangu-adffd
+      - key: GANGU_AUTH_REQUIRED
+        value: "true"
       - key: GANGU_DRY_RUN
         value: "true"          # never place real Zepto orders from prod
+      - key: ENABLE_REAL_PURCHASES
+        value: "false"
+      - key: GANGU_STATE_BACKEND
+        value: mongodb
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DATABASE
+        value: gangu
+      - key: SWIGGY_TOKEN_ENCRYPTION_KEY
+        sync: false

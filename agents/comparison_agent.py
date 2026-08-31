@@ -840,7 +840,9 @@ def create_fallback_comparison(search_results: Dict[str, Any]) -> Dict[str, Any]
             "rating": rating if rating > 0 else 3.5,  # Default rating if missing
             "availability": available,
             "score": round(final_score, 2),
-            "product_id": product.get("product_id", "unknown")
+            "product_id": product.get("product_id", "unknown"),
+            "source": product.get("source", "unknown"),
+            "url": product.get("url") or product.get("product_url")
         })
     
     # Sort by score (higher is better now)
@@ -942,8 +944,6 @@ def compare_products(search_results: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Comprehensive comparison with rankings, scores, and insights
     """
-    global chat_history
-    
     # REAL AGENTIC SYSTEM: Retry with exponential backoff, fail transparently
     max_retries = 3
     retry_delay = 2
@@ -954,12 +954,14 @@ def compare_products(search_results: Dict[str, Any]) -> Dict[str, Any]:
             search_json = json.dumps(search_results, ensure_ascii=False, indent=2)
             
             # Add user message to history
-            chat_history.append({"role": "user", "parts": [{"text": search_json}]})
+            request_history = chat_history[:2] + [
+                {"role": "user", "parts": [{"text": search_json}]}
+            ]
             
             # Call Gemini API with JSON mode
             response = client.models.generate_content(
                 model=MODEL_NAME,
-                contents=chat_history,
+                contents=request_history,
                 config={
                     "temperature": 0.2,  # Lower temperature for more consistent JSON
                     "top_p": 0.95,
@@ -972,8 +974,6 @@ def compare_products(search_results: Dict[str, Any]) -> Dict[str, Any]:
             response_text = response.text
             
             # Add model response to history
-            chat_history.append({"role": "model", "parts": [{"text": response_text}]})
-            
             # Clean and parse JSON
             cleaned_response = clean_json_response(response_text)
             parsed_output = json.loads(cleaned_response)

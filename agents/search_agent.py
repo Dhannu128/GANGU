@@ -1025,7 +1025,7 @@ async def search_zepto_mcp(item_name: str) -> dict:
             "reviews_count": 500,
             "product_id": result.get("product_id", "zepto_" + product_name.replace(" ", "_").lower()),
             "elderly_friendly": True,
-            "source": "mcp_server",
+            "source": "catalog_estimate",
             "brand": "Zepto",
             "currency": "INR"
         }
@@ -1034,7 +1034,7 @@ async def search_zepto_mcp(item_name: str) -> dict:
             "platform": "Zepto",
             "found": False,
             "message": result.get("message", "Not found"),
-            "source": "mcp_server"
+            "source": "catalog_estimate"
         }
 
 
@@ -1084,7 +1084,7 @@ async def search_swiggy_mcp(item_name: str) -> dict:
                 "reviews_count": 800,
                 "product_id": "swiggy_" + str(product.get("product_name", item_name)).replace(' ', '_').lower(),
                 "elderly_friendly": True,
-                "source": "mcp_server",
+                "source": "mock_swiggy_mcp",
                 "brand": extract_brand_from_item_name(product.get("product_name", item_name)),
                 "currency": "INR"
             }
@@ -1093,7 +1093,7 @@ async def search_swiggy_mcp(item_name: str) -> dict:
                 "platform": "Swiggy",
                 "found": False,
                 "message": "No products found",
-                "source": "mcp_server"
+                "source": "mock_swiggy_mcp"
             }
     except Exception as e:
         print(f"Swiggy MCP search error: {e}")
@@ -1101,7 +1101,7 @@ async def search_swiggy_mcp(item_name: str) -> dict:
             "platform": "Swiggy",
             "found": False,
             "error": str(e),
-            "source": "mcp_server"
+            "source": "mock_swiggy_mcp"
         }
     finally:
         try:

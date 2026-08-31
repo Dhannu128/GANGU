@@ -55,8 +55,8 @@ export default function PhoneOtpForm({ mode }: PhoneOtpFormProps) {
         setDevHint(res.devHint || '')
         setTimeout(() => otpRefs.current[0]?.focus(), 60)
       }
-    } catch (err: any) {
-      setError(err.message || 'Could not send OTP. Please try again.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not send OTP. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -112,8 +112,8 @@ export default function PhoneOtpForm({ mode }: PhoneOtpFormProps) {
         )
         router.push('/app')
       }
-    } catch (err: any) {
-      setError(err.message || 'Invalid code. Please try again.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Invalid code. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -142,8 +142,8 @@ export default function PhoneOtpForm({ mode }: PhoneOtpFormProps) {
         })
         router.push('/app')
       }
-    } catch (err: any) {
-      setError(err.message || `Could not sign in with ${provider}.`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : `Could not sign in with ${provider}.`)
     } finally {
       setSocialLoading(null)
     }
@@ -262,7 +262,7 @@ export default function PhoneOtpForm({ mode }: PhoneOtpFormProps) {
           <a href="#" className="text-slate-400 hover:text-amber-300 underline underline-offset-2">
             Privacy Policy
           </a>
-          . You'll receive a one-time SMS — standard rates may apply.
+          . You&apos;ll receive a one-time SMS — standard rates may apply.
         </p>
 
         <div className="flex items-center gap-3">
@@ -400,7 +400,7 @@ export default function PhoneOtpForm({ mode }: PhoneOtpFormProps) {
       <div className="text-center text-sm">
         {resendIn > 0 ? (
           <p className="text-slate-500">
-            Didn't get the code? Resend in <span className="text-slate-300 font-semibold">{resendIn}s</span>
+            Didn&apos;t get the code? Resend in <span className="text-slate-300 font-semibold">{resendIn}s</span>
           </p>
         ) : (
           <button
