@@ -36,10 +36,14 @@ services:
       - key: ENABLE_REAL_PURCHASES
         value: "false"
       - key: GANGU_STATE_BACKEND
-        value: mongodb
+        # The free service runs one worker. Enable MongoDB only after a real
+        # MONGODB_URI and SWIGGY_TOKEN_ENCRYPTION_KEY are configured.
+        value: memory
       - key: MONGODB_URI
         sync: false
       - key: MONGODB_DATABASE
         value: gangu
       - key: SWIGGY_TOKEN_ENCRYPTION_KEY
         sync: false
+      - key: SWIGGY_REDIRECT_URI
+        value: https://gangu-api.onrender.com/api/auth/callback/swiggy
