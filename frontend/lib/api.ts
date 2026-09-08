@@ -1,35 +1,88 @@
-import axios from 'axios'
-import { useGANGUStore, type Language } from './store'
+import axios, { type AxiosRequestConfig } from 'axios'
+import { signOut as firebaseSignOut } from 'firebase/auth'
+import { auth } from './firebase'
+import { useGANGUStore } from './store'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || API_BASE_URL.replace(/^http/, 'ws').replace(/\/$/, '')
+
+export const requestErrorMessage = (error: unknown): string => {
+  if (!axios.isAxiosError(error)) return 'GANGU could not process your request. Please try again.'
+  if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+    return 'The request took too long. Please wait a moment before trying again.'
+  }
+  if (!error.response) return 'Cannot reach GANGU. Please check your connection or try again when the service is available.'
+  switch (error.response.status) {
+    case 401: return 'Please sign in again to continue.'
+    case 403: return 'This request is not available for your account. Please start a new session.'
+    case 409: return 'Your previous request is still processing. Please wait for it to finish.'
+    case 429: return 'The service is busy. Please wait a moment and try again.'
+    case 503: return 'GANGU is temporarily unavailable. Please try again shortly.'
+    default: return 'GANGU could not process your request. Please try again.'
+  }
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000,
-  headers: {
-    // ngrok-free serves a confirmation page on first hit unless this header
-    // is set. No-op when the backend isn't behind ngrok.
-    'ngrok-skip-browser-warning': 'true',
-  },
+  headers: { 'ngrok-skip-browser-warning': 'true' },
 })
 
-api.interceptors.request.use((config) => {
-  const token = useGANGUStore.getState().auth.token
-  if (token) config.headers.Authorization = `Bearer ${token}`
+api.interceptors.request.use(async (config) => {
+  const firebaseUser = auth.currentUser
+  if (firebaseUser) config.headers.Authorization = `Bearer ${await firebaseUser.getIdToken()}`
   return config
 })
 
-// === WebSocket ===
+type RetryableRequest = AxiosRequestConfig & { _authRetried?: boolean }
+
+const expireLocalSession = () => {
+  const store = useGANGUStore.getState()
+  store.signOut()
+  if (!store.toasts.some((toast) => toast.title === 'Your session has expired')) {
+    store.pushToast({
+      variant: 'error',
+      title: 'Your session has expired',
+      description: 'Please sign in again to continue safely.',
+    })
+  }
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error: unknown) => {
+    if (!axios.isAxiosError(error) || error.response?.status !== 401 || !error.config) {
+      return Promise.reject(error)
+    }
+    const original = error.config as RetryableRequest
+    if (original._authRetried || !auth.currentUser) {
+      await firebaseSignOut(auth).catch(() => undefined)
+      expireLocalSession()
+      return Promise.reject(error)
+    }
+    original._authRetried = true
+    try {
+      const token = await auth.currentUser.getIdToken(true)
+      original.headers = { ...original.headers, Authorization: `Bearer ${token}` }
+      return api.request(original)
+    } catch {
+      await firebaseSignOut(auth).catch(() => undefined)
+      expireLocalSession()
+      return Promise.reject(error)
+    }
+  },
+)
+
 let ws: WebSocket | null = null
+let wsGeneration = 0
 
 export const connectWebSocket = async (sessionId: string) => {
   const store = useGANGUStore.getState()
-
+  const generation = wsGeneration
   if (ws && ws.readyState === WebSocket.OPEN) return ws
-
   try {
     const ticketResponse = await api.post('/api/auth/ws-ticket')
+    if (generation !== wsGeneration) return null
     const ticket = encodeURIComponent(ticketResponse.data.ticket)
     ws = new WebSocket(`${WS_BASE_URL}/ws/${sessionId}?ticket=${ticket}`)
   } catch {
@@ -37,53 +90,35 @@ export const connectWebSocket = async (sessionId: string) => {
     return null
   }
 
-  ws.onopen = () => {
-    store.setConnected(true)
-  }
-
+  ws.onopen = () => store.setConnected(true)
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data)
-    if (data.type === 'agent_update') {
-      store.addAgentStep({
-        step: data.step,
-        status: data.status,
-        message: data.message,
-        data: data.data,
-        timestamp: data.timestamp,
-      })
-      if (data.step === 'cancelled') {
-        store.setProcessing(false)
-        store.setCancelled(true)
-      }
+    if (data.type !== 'agent_update') return
+    store.addAgentStep({
+      step: data.step,
+      status: data.status,
+      message: data.message,
+      data: data.data,
+      timestamp: data.timestamp,
+    })
+    if (data.step === 'cancelled') {
+      store.setProcessing(false)
+      store.setCancelled(true)
     }
   }
-
   ws.onerror = () => store.setConnected(false)
   ws.onclose = () => store.setConnected(false)
-
   return ws
 }
 
 export const disconnectWebSocket = () => {
-  if (ws) {
-    ws.close()
-    ws = null
-  }
+  wsGeneration += 1
+  ws?.close()
+  ws = null
 }
 
-// === Order pipeline ===
-export const processUserInput = async (
-  message: string,
-  sessionId?: string,
-  signal?: AbortSignal,
-) => {
-  const response = await api.post(
-    '/api/chat/process',
-    { message, session_id: sessionId },
-    { signal },
-  )
-  return response.data
-}
+export const processUserInput = async (message: string, sessionId?: string, signal?: AbortSignal) =>
+  (await api.post('/api/chat/process', { message, session_id: sessionId }, { signal })).data
 
 export const confirmOrder = async (
   sessionId: string,
@@ -91,134 +126,20 @@ export const confirmOrder = async (
   productIndex: number,
   deliveryAddress: string,
   paymentMethod: 'upi' | 'cod' | 'card',
-) => {
-  const response = await api.post('/api/order/confirm', {
-    session_id: sessionId,
-    quote_id: quoteId,
-    selected_product_index: productIndex,
-    delivery_address: deliveryAddress,
-    payment_method: paymentMethod,
-  })
-  return response.data
-}
+) => (await api.post('/api/order/confirm', {
+  session_id: sessionId,
+  quote_id: quoteId,
+  selected_product_index: productIndex,
+  delivery_address: deliveryAddress,
+  payment_method: paymentMethod,
+})).data
 
-export const getSessionData = async (sessionId: string) => {
-  const response = await api.get(`/api/session/${sessionId}`)
-  return response.data
-}
+export const getSessionData = async (sessionId: string) =>
+  (await api.get(`/api/session/${sessionId}`)).data
 
-export const getOrderHistory = async () => {
-  const response = await api.get('/api/history')
-  return response.data
-}
+export const getOrderHistory = async () => (await api.get('/api/history')).data
 
-export const cancelProcessing = async (sessionId: string) => {
-  const response = await api.post('/api/cancel', { session_id: sessionId })
-  return response.data
-}
-
-// === Auth (mock + backend-ready) ===
-// The backend will eventually expose /api/auth/otp/request and /api/auth/otp/verify.
-// Until then we simulate locally so the UX flow is testable end-to-end.
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-export interface OtpRequestResult {
-  success: boolean
-  channel: 'sms' | 'whatsapp'
-  retryInSeconds: number
-  // Dev-only hint, never shown to real users in production
-  devHint?: string
-}
-
-export interface OtpVerifyResult {
-  success: boolean
-  token: string
-  user: {
-    id: string
-    name: string
-    phone: string
-    language: Language
-    address: string
-    isNewUser: boolean
-  }
-}
-
-export const requestOtp = async (phone: string): Promise<OtpRequestResult> => {
-  try {
-    const response = await api.post('/api/auth/otp/request', { phone })
-    return response.data
-  } catch {
-    await sleep(700)
-    return {
-      success: true,
-      channel: 'sms',
-      retryInSeconds: 30,
-      devHint: 'Use 123456 to sign in',
-    }
-  }
-}
-
-export const verifyOtp = async (
-  phone: string,
-  code: string,
-  name?: string,
-  language: Language = 'hinglish'
-): Promise<OtpVerifyResult> => {
-  try {
-    const response = await api.post('/api/auth/otp/verify', { phone, code, name, language })
-    return response.data
-  } catch {
-    await sleep(900)
-    if (code !== '123456' && code.length !== 6) {
-      throw new Error('Invalid code. Try 123456 in dev mode.')
-    }
-    const isNewUser = !!name
-    return {
-      success: true,
-      token: `mock-token-${Date.now()}`,
-      user: {
-        id: `user_${Date.now()}`,
-        name: name || phoneToName(phone),
-        phone,
-        language,
-        address: 'Home · 12, Rose Apt, Indore 452001',
-        isNewUser,
-      },
-    }
-  }
-}
-
-function phoneToName(phone: string): string {
-  const last4 = phone.replace(/\D/g, '').slice(-4)
-  return `Friend ${last4}`
-}
-
-export type SocialProvider = 'google' | 'whatsapp'
-
-export const socialSignIn = async (
-  provider: SocialProvider,
-  language: Language = 'hinglish'
-): Promise<OtpVerifyResult> => {
-  try {
-    const response = await api.post('/api/auth/social', { provider, language })
-    return response.data
-  } catch {
-    await sleep(800)
-    const seed = Math.floor(Math.random() * 9000) + 1000
-    return {
-      success: true,
-      token: `mock-${provider}-${Date.now()}`,
-      user: {
-        id: `user_${provider}_${seed}`,
-        name: provider === 'google' ? 'Asha Verma' : 'Lata Sharma',
-        phone: `+91 98xxxxx${seed.toString().slice(-3)}`,
-        language,
-        address: 'Home · 12, Rose Apt, Indore 452001',
-        isNewUser: true,
-      },
-    }
-  }
-}
+export const cancelProcessing = async (sessionId: string) =>
+  (await api.post('/api/cancel', { session_id: sessionId })).data
 
 export default api

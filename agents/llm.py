@@ -19,7 +19,7 @@ _GANGU_ROOT = Path(__file__).parent.parent
 load_dotenv(dotenv_path=_GANGU_ROOT / ".env")
 load_dotenv()
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 
 # The pool of Gemini API keys (loaded from .env)
 # Provide multiple keys separated by commas in your .env file like:
@@ -32,7 +32,7 @@ if not GEMINI_KEYS:
     GEMINI_KEYS = ["DUMMY_KEY_PLEASE_SET_IN_ENV"]
 
 def get_model_name() -> str:
-    """Resolve the model id from env, falling back to gemini-2.5-flash."""
+    """Resolve the model id from env, falling back to gemini-3.6-flash."""
     return os.environ.get("LLM_MODEL", DEFAULT_MODEL)
 
 def Client(*args: Any, **kwargs: Any) -> genai.Client:

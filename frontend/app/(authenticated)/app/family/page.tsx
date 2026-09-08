@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import { useGANGUStore, type FamilyMember } from '@/lib/store'
-import { Users, UserPlus, Phone, Shield, Trash2, Sparkles, X, Heart } from 'lucide-react'
+import { Users, UserPlus, Phone, Shield, Trash2, X, Heart } from 'lucide-react'
 
 const PERMISSION_LABEL: Record<FamilyMember['permissions'][number], string> = {
-  view: 'Can view',
-  order: 'Can order',
-  pay: 'Can pay',
+  view: 'Help review',
+  order: 'Help order',
+  pay: 'Help with payment',
 }
 
 export default function FamilyPage() {
@@ -30,7 +30,7 @@ export default function FamilyPage() {
       name: draftName.trim(),
       relationship: draftRel.trim() || 'Family',
       phone: draftPhone.trim(),
-      lastActive: 'Just invited',
+      lastActive: 'Saved on this device',
       permissions: draftPerms,
     })
     setInviting(false)
@@ -51,20 +51,20 @@ export default function FamilyPage() {
             </span>
             <h1 className="text-display text-3xl md:text-4xl mb-2">Family</h1>
             <p className="text-slate-400 max-w-xl">
-              Invite your children or grandchildren to manage orders on your behalf — they can
-              review, top-up wallet, and set spending limits without taking control of your account.
+              Keep trusted household contacts and note how they may help. This information is saved
+              only in this browser; GANGU does not send an invitation or grant account access yet.
             </p>
           </div>
           <button onClick={() => setInviting(true)} className="btn-primary text-sm flex-shrink-0">
             <UserPlus className="w-4 h-4" />
-            Invite
+            Add contact
           </button>
         </header>
 
         {inviting && (
           <div className="surface-card p-6 mb-5 animate-rise">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-display text-xl">Invite a family member</h3>
+              <h3 className="text-display text-xl">Add a household contact</h3>
               <button
                 onClick={() => setInviting(false)}
                 className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center text-slate-400"
@@ -96,7 +96,8 @@ export default function FamilyPage() {
               />
             </div>
 
-            <p className="text-xs uppercase tracking-widest font-bold text-slate-500 mb-3">Permissions</p>
+            <p className="text-xs uppercase tracking-widest font-bold text-slate-500 mb-1">Support notes</p>
+            <p className="text-xs text-slate-500 mb-3">These choices do not grant account permissions.</p>
             <div className="flex flex-wrap gap-2 mb-5">
               {(['view', 'order', 'pay'] as const).map((p) => {
                 const on = draftPerms.includes(p)
@@ -121,8 +122,8 @@ export default function FamilyPage() {
               disabled={!draftName.trim() || !draftPhone.trim()}
               className="btn-primary w-full"
             >
-              <Sparkles className="w-4 h-4" />
-              Send invite
+              <UserPlus className="w-4 h-4" />
+              Save contact on this device
             </button>
           </div>
         )}
@@ -130,10 +131,10 @@ export default function FamilyPage() {
         {familyMembers.length === 0 && !inviting ? (
           <div className="surface-card p-10 text-center">
             <Users className="w-10 h-10 mx-auto mb-4 text-slate-700" />
-            <p className="text-slate-400 mb-5">No family members linked yet.</p>
+            <p className="text-slate-400 mb-5">No household contacts saved on this device.</p>
             <button onClick={() => setInviting(true)} className="btn-primary">
               <UserPlus className="w-4 h-4" />
-              Invite your first family member
+              Add your first contact
             </button>
           </div>
         ) : (
@@ -141,7 +142,7 @@ export default function FamilyPage() {
             {familyMembers.map((m) => (
               <article key={m.id} className="surface-card p-6">
                 <div className="flex items-start gap-4 mb-5">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-400 to-fuchsia-600 flex items-center justify-center font-display font-extrabold text-ink-950 text-base flex-shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center font-display font-extrabold text-emerald-900 text-base flex-shrink-0">
                     {m.name
                       .split(' ')
                       .map((s) => s[0])

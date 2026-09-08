@@ -1,233 +1,226 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader } from 'lucide-react'
-import { signInWithPopup, signInWithPhoneNumber, ConfirmationResult, RecaptchaVerifier as FirebaseRecaptchaVerifier } from 'firebase/auth'
+import { useRouter } from 'next/navigation'
+import {
+  type ConfirmationResult,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  signInWithPopup,
+} from 'firebase/auth'
+import { ArrowLeft, Check, LoaderCircle, Mic, Phone, ShieldCheck } from 'lucide-react'
+import Logo from '@/components/Logo'
 import { auth, googleProvider } from '@/lib/firebase'
+import { authErrorMessage } from '@/lib/auth-errors'
 import { useGANGUStore } from '@/lib/store'
-import OTPModal from '@/components/auth/OTPModal'
+
+const PHONE_RETRY_SECONDS = 30
 
 export default function SignupPage() {
   const router = useRouter()
-  const signIn = useGANGUStore(state => state.signIn)
-  
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const { auth: authState, signIn } = useGANGUStore()
+  const verifierRef = useRef<RecaptchaVerifier | null>(null)
+  const confirmationRef = useRef<ConfirmationResult | null>(null)
+  const [step, setStep] = useState<'phone' | 'code'>('phone')
+  const [phone, setPhone] = useState('')
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState<'google' | 'phone' | 'verify' | null>(null)
   const [error, setError] = useState('')
-  
-  // Phone Auth State
-  const [showOTP, setShowOTP] = useState(false)
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
+  const [resendIn, setResendIn] = useState(0)
 
-  // Initialize reCAPTCHA on mount
   useEffect(() => {
-    if (typeof window !== 'undefined' && !window.recaptchaVerifier) {
-      window.recaptchaVerifier = new FirebaseRecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
+    if (authState.initialized && authState.isAuthenticated) router.replace('/app')
+  }, [authState.initialized, authState.isAuthenticated, router])
+
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const timer = window.setTimeout(() => setResendIn((seconds) => seconds - 1), 1000)
+    return () => window.clearTimeout(timer)
+  }, [resendIn])
+
+  useEffect(() => () => verifierRef.current?.clear(), [])
+
+  const getVerifier = () => {
+    if (!verifierRef.current) {
+      verifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
       })
     }
-  }, [])
+    return verifierRef.current
+  }
 
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true)
+  const clearVerifier = () => {
+    verifierRef.current?.clear()
+    verifierRef.current = null
+  }
+
+  const completeSignIn = async () => {
+    const firebaseUser = auth.currentUser
+    if (!firebaseUser) throw new Error('Firebase did not return a signed-in user.')
+    signIn({
+      id: firebaseUser.uid,
+      name: firebaseUser.displayName || 'GANGU user',
+      phone: firebaseUser.phoneNumber || '',
+      email: firebaseUser.email || undefined,
+      photoURL: firebaseUser.photoURL || undefined,
+      language: 'hinglish',
+      address: '',
+    }, await firebaseUser.getIdToken())
+    router.replace('/app')
+  }
+
+  const handleGoogle = async () => {
+    setBusy('google')
     setError('')
     try {
-      const result = await signInWithPopup(auth, googleProvider)
-      const user = result.user
-      
-      // Update our global state
-      signIn({
-        id: user.uid,
-        name: user.displayName || 'User',
-        phone: user.phoneNumber || '',
-        email: user.email || '',
-        photoURL: user.photoURL || '',
-        language: 'hinglish',
-        address: 'Please set your delivery address in settings',
-      }, await user.getIdToken())
-
-      router.push('/app')
-    } catch (err: unknown) {
-      console.error(err)
-      setError(err instanceof Error ? err.message : 'Failed to sign in with Google.')
+      await signInWithPopup(auth, googleProvider)
+      await completeSignIn()
+    } catch (authError) {
+      setError(authErrorMessage(authError, 'Google sign-in could not be completed.'))
     } finally {
-      setIsLoading(false)
+      setBusy(null)
     }
   }
 
-  const formatPhoneNumber = (number: string) => {
-    // Default to +91 (India) if no country code provided, as per Swiggy demo standard
-    let formatted = number.trim()
-    if (!formatted.startsWith('+')) {
-      formatted = '+91' + formatted
+  const sendCode = async (event?: React.FormEvent) => {
+    event?.preventDefault()
+    if (phone.length !== 10) {
+      setError('Enter a valid 10-digit Indian mobile number.')
+      return
     }
-    return formatted
-  }
-
-  const handlePhoneSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!phoneNumber) return
-    
-    setIsLoading(true)
+    setBusy('phone')
     setError('')
     try {
-      const formattedNumber = formatPhoneNumber(phoneNumber)
-      const appVerifier = window.recaptchaVerifier
-      
-      const confirmation = await signInWithPhoneNumber(auth, formattedNumber, appVerifier)
-      setConfirmationResult(confirmation)
-      setShowOTP(true)
-    } catch (err: unknown) {
-      console.error(err)
-      setError('Failed to send SMS. Please ensure the phone number is correct.')
-      // Reset recaptcha if failed
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.render().then((widgetId: number) => {
-          window.grecaptcha?.reset(widgetId)
-        });
-      }
+      confirmationRef.current = await signInWithPhoneNumber(auth, `+91${phone}`, getVerifier())
+      setStep('code')
+      setCode('')
+      setResendIn(PHONE_RETRY_SECONDS)
+    } catch (authError) {
+      clearVerifier()
+      setError(authErrorMessage(authError, 'We could not send the SMS code.'))
     } finally {
-      setIsLoading(false)
+      setBusy(null)
     }
   }
 
-  const handleVerifyOTP = async (otp: string) => {
-    if (!confirmationResult) return
-    
-    try {
-      const result = await confirmationResult.confirm(otp)
-      const user = result.user
-      
-      signIn({
-        id: user.uid,
-        name: 'User', // Prompt for name later or use default
-        phone: user.phoneNumber || phoneNumber,
-        language: 'hinglish',
-        address: 'Please set your delivery address in settings',
-      }, await user.getIdToken())
-
-      router.push('/app')
-    } catch {
-      throw new Error('Invalid OTP. Please try again.')
+  const verifyCode = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!confirmationRef.current || code.length !== 6) {
+      setError('Enter the complete 6-digit code from the SMS.')
+      return
     }
-  }
-
-  const handleResendOTP = async () => {
-    setIsLoading(true)
+    setBusy('verify')
+    setError('')
     try {
-      const formattedNumber = formatPhoneNumber(phoneNumber)
-      const appVerifier = window.recaptchaVerifier
-      const confirmation = await signInWithPhoneNumber(auth, formattedNumber, appVerifier)
-      setConfirmationResult(confirmation)
-    } catch (err: unknown) {
-      throw err
+      await confirmationRef.current.confirm(code)
+      await completeSignIn()
+    } catch (authError) {
+      setError(authErrorMessage(authError, 'The verification code could not be confirmed.'))
     } finally {
-      setIsLoading(false)
+      setBusy(null)
     }
   }
 
   return (
-    <main className="min-h-screen bg-ink-950 flex flex-col relative overflow-hidden">
-      {/* Background ambient light */}
-      <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-amber-500/10 to-transparent pointer-events-none" />
-
-      {/* Header */}
-      <header className="absolute top-0 inset-x-0 p-6 z-10">
-        <Link href="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
+    <main className="auth-page">
+      <header className="auth-header">
+        <Link href="/" className="brand-lockup" aria-label="GANGU home">
+          <Logo size={38} />
+          <span>GANGU</span>
         </Link>
+        <Link href="/" className="quiet-link"><ArrowLeft aria-hidden /> Back to home</Link>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-6 relative z-10">
-        <div className="surface-card w-full max-w-md p-8 md:p-10">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 mb-6">
-              <span className="text-2xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">
-                G
-              </span>
-            </div>
-            <h1 className="text-3xl font-display font-bold text-white mb-2">Welcome to GANGU</h1>
-            <p className="text-slate-400">Sign in to start ordering groceries with your voice.</p>
+      <div className="auth-layout">
+        <section className="auth-intro" aria-labelledby="auth-heading">
+          <p className="eyebrow">Grocery help that listens</p>
+          <h1 id="auth-heading">Welcome. Let&apos;s get your groceries sorted.</h1>
+          <p className="auth-lede">
+            Sign in securely, then speak or type what you need. You always review the result before anything happens.
+          </p>
+          <ul className="trust-list">
+            <li><Mic aria-hidden /><span><strong>Voice first</strong>Hindi, English, or Hinglish</span></li>
+            <li><ShieldCheck aria-hidden /><span><strong>You stay in control</strong>Every order needs confirmation</span></li>
+            <li><Check aria-hidden /><span><strong>Honest results</strong>Estimates and live data are clearly labelled</span></li>
+          </ul>
+        </section>
+
+        <section className="auth-card" aria-label="Sign in to GANGU">
+          <div className="auth-card-heading">
+            <p className="eyebrow">Secure sign in</p>
+            <h2>{step === 'phone' ? 'Continue to GANGU' : 'Check your messages'}</h2>
+            <p>{step === 'phone' ? 'Use Google or your Indian mobile number.' : `We sent a code to +91 ${phone}.`}</p>
           </div>
 
-          <button
-            onClick={handleGoogleSignIn}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-900 font-semibold py-3.5 px-4 rounded-xl transition-colors mb-6 disabled:opacity-50"
-          >
-            {isLoading ? <Loader className="w-5 h-5 animate-spin" /> : (
-              <>
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                </svg>
+          {step === 'phone' ? (
+            <>
+              <button className="google-button" onClick={handleGoogle} disabled={busy !== null}>
+                {busy === 'google' ? <LoaderCircle className="spin" aria-hidden /> : <GoogleMark />}
                 Continue with Google
-              </>
-            )}
-          </button>
-
-          <div className="flex items-center gap-4 mb-6">
-            <div className="h-px bg-white/10 flex-1" />
-            <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">or</span>
-            <div className="h-px bg-white/10 flex-1" />
-          </div>
-
-          <form onSubmit={handlePhoneSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">Phone Number</label>
-              <div className="relative flex items-center">
-                <div className="absolute left-3 flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-slate-400 font-medium text-sm">
-                  +91
+              </button>
+              <div className="or-divider"><span>or use your mobile</span></div>
+              <form onSubmit={sendCode} className="auth-form">
+                <label htmlFor="phone">Mobile number</label>
+                <div className="phone-field">
+                  <span><Phone aria-hidden /> +91</span>
+                  <input
+                    id="phone"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value.replace(/\D/g, '').slice(0, 10))}
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    placeholder="98765 43210"
+                    aria-describedby="phone-help"
+                  />
                 </div>
-                <input
-                  type="tel"
-                  placeholder="98765 43210"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-14 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all"
-                  required
-                />
+                <p id="phone-help" className="field-help">We will send a one-time code by SMS.</p>
+                <button className="primary-action" disabled={busy !== null || phone.length !== 10}>
+                  {busy === 'phone' ? <><LoaderCircle className="spin" aria-hidden /> Sending code</> : 'Send secure code'}
+                </button>
+              </form>
+            </>
+          ) : (
+            <form onSubmit={verifyCode} className="auth-form">
+              <label htmlFor="otp">6-digit verification code</label>
+              <input
+                id="otp"
+                className="otp-field"
+                value={code}
+                onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="• • • • • •"
+                autoFocus
+              />
+              <button className="primary-action" disabled={busy !== null || code.length !== 6}>
+                {busy === 'verify' ? <><LoaderCircle className="spin" aria-hidden /> Checking code</> : 'Verify and continue'}
+              </button>
+              <div className="code-actions">
+                <button type="button" className="quiet-link" onClick={() => { setStep('phone'); setError('') }}>Change number</button>
+                <button type="button" className="quiet-link" disabled={resendIn > 0 || busy !== null} onClick={() => void sendCode()}>
+                  {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+                </button>
               </div>
-            </div>
+            </form>
+          )}
 
-            {error && (
-              <p className="text-sm text-rose-400 animate-fade-in">{error}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading || phoneNumber.length < 10}
-              className="w-full btn-primary py-3.5 disabled:opacity-50 flex justify-center"
-            >
-              {isLoading && !showOTP ? <Loader className="w-5 h-5 animate-spin" /> : 'Send OTP'}
-            </button>
-          </form>
-
-          {/* Invisible recaptcha container for Phone Auth */}
-          <div id="recaptcha-container"></div>
-        </div>
+          {error && <div className="auth-error" role="alert">{error}</div>}
+          <div id="recaptcha-container" />
+          <p className="auth-footnote">Protected by Firebase Authentication. GANGU never asks for your OTP by phone or chat.</p>
+        </section>
       </div>
-
-      <OTPModal
-        isOpen={showOTP}
-        onClose={() => setShowOTP(false)}
-        phoneNumber={formatPhoneNumber(phoneNumber)}
-        onVerify={handleVerifyOTP}
-        resendOTP={handleResendOTP}
-      />
     </main>
   )
 }
 
-// Add types for global window variables
-declare global {
-  interface Window {
-    recaptchaVerifier: FirebaseRecaptchaVerifier
-    grecaptcha?: { reset: (widgetId: number) => void }
-  }
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.8 3-4.4 3-7.4Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.2-2.5c-.9.6-2 1-3.5 1a5.9 5.9 0 0 1-5.5-4.1H3.2v2.6A10 10 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.5 14a6 6 0 0 1 0-3.9V7.5H3.2a10 10 0 0 0 0 9.1L6.5 14Z" />
+      <path fill="#EA4335" d="M12 5.9c1.6 0 3 .5 4.1 1.6L19 4.6A9.7 9.7 0 0 0 3.2 7.5l3.3 2.6A5.9 5.9 0 0 1 12 5.9Z" />
+    </svg>
+  )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { useGANGUStore } from '@/lib/store'
 import { connectWebSocket, disconnectWebSocket } from '@/lib/api'
@@ -9,8 +9,6 @@ import MobileNav from './MobileNav'
 import Logo from '@/components/Logo'
 import Link from 'next/link'
 import { Loader } from 'lucide-react'
-import { onIdTokenChanged } from 'firebase/auth'
-import { auth as firebaseAuth } from '@/lib/firebase'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -24,7 +22,6 @@ export default function AppShell({ children }: AppShellProps) {
     () => true,
     () => false,
   )
-  const [authReady, setAuthReady] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle('gangu-large-text', settings.largerText)
@@ -34,38 +31,15 @@ export default function AppShell({ children }: AppShellProps) {
     }
   }, [settings.largerText, settings.higherContrast])
 
-  useEffect(() => onIdTokenChanged(firebaseAuth, async (firebaseUser) => {
-    const store = useGANGUStore.getState()
-    if (!firebaseUser) {
-      store.signOut()
-      setAuthReady(true)
-      return
-    }
-    const existing = store.user
-    store.signIn({
-      id: firebaseUser.uid,
-      name: firebaseUser.displayName || existing?.name || 'User',
-      phone: firebaseUser.phoneNumber || existing?.phone || '',
-      email: firebaseUser.email || existing?.email,
-      photoURL: firebaseUser.photoURL || existing?.photoURL,
-      language: existing?.language || 'hinglish',
-      address: existing?.address || 'Please set your delivery address in settings',
-    }, await firebaseUser.getIdToken())
-    setAuthReady(true)
-  }, () => {
-    useGANGUStore.getState().signOut()
-    setAuthReady(true)
-  }), [])
-
   useEffect(() => {
-    if (!hydrated || !authReady) return
+    if (!hydrated || !auth.initialized) return
     if (!auth.isAuthenticated) {
       router.replace('/signin')
     }
-  }, [hydrated, authReady, auth.isAuthenticated, router])
+  }, [hydrated, auth.initialized, auth.isAuthenticated, router])
 
   useEffect(() => {
-    if (!hydrated || !authReady || !auth.isAuthenticated) return
+    if (!hydrated || !auth.initialized || !auth.isAuthenticated) return
     const id = sessionId || `session_${Date.now()}`
     if (!sessionId) setSessionId(id)
     void connectWebSocket(id)
@@ -73,12 +47,12 @@ export default function AppShell({ children }: AppShellProps) {
       disconnectWebSocket()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, authReady, auth.isAuthenticated])
+  }, [hydrated, auth.initialized, auth.isAuthenticated])
 
-  if (!hydrated || !authReady) {
+  if (!hydrated || !auth.initialized) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader className="w-6 h-6 text-amber-300 animate-spin" />
+        <Loader className="w-6 h-6 text-[#0f766e] animate-spin" />
       </div>
     )
   }
@@ -87,7 +61,7 @@ export default function AppShell({ children }: AppShellProps) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">
         <Logo />
-        <p className="text-slate-400">Redirecting to sign in…</p>
+        <p className="text-[#4f6072]">Redirecting to sign in…</p>
         <Link href="/signin" className="btn-primary text-sm">
           Sign in
         </Link>
@@ -96,9 +70,9 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="min-h-screen relative">
+    <div className="gangu-app min-h-screen relative">
       <LeftRail />
-      <div className="lg:ml-[240px] pb-20 lg:pb-0">{children}</div>
+      <div className="lg:ml-[248px] pb-20 lg:pb-0">{children}</div>
       <MobileNav />
     </div>
   )

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import json
+import logging
 import secrets
 import threading
 import time
@@ -24,6 +25,8 @@ def _env_flag(name: str, default: bool) -> bool:
 
 
 AUTH_REQUIRED = _env_flag("GANGU_AUTH_REQUIRED", True)
+DEFAULT_FIREBASE_PROJECT_ID = "gangu-adffd"
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -35,20 +38,36 @@ class AuthenticatedUser:
 
 def _verify_firebase_token(token: str) -> AuthenticatedUser:
     try:
-        import firebase_admin
-        from firebase_admin import auth, credentials
+        # Firebase's web project id is public configuration. Keeping the known
+        # GANGU id as a local fallback lets verification work before a root
+        # .env has been filled in. Deployments should still set the variable.
+        project_id = os.getenv("FIREBASE_PROJECT_ID", DEFAULT_FIREBASE_PROJECT_ID).strip()
+        service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
 
-        if not firebase_admin._apps:
-            project_id = os.getenv("FIREBASE_PROJECT_ID")
-            options = {"projectId": project_id} if project_id else None
-            service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
-            credential = credentials.Certificate(json.loads(service_account_json)) if service_account_json else None
-            firebase_admin.initialize_app(credential=credential, options=options)
+        if service_account_json:
+            # Admin credentials permit revocation checking in production.
+            import firebase_admin
+            from firebase_admin import auth, credentials
 
-        decoded = auth.verify_id_token(
-            token,
-            check_revoked=bool(os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")),
-        )
+            if not firebase_admin._apps:
+                firebase_admin.initialize_app(
+                    credential=credentials.Certificate(json.loads(service_account_json)),
+                    options={"projectId": project_id},
+                )
+            decoded = auth.verify_id_token(token, check_revoked=True)
+        else:
+            # Local development and credential-free deployments can securely
+            # validate signature, issuer, audience and expiry against Google's
+            # Firebase public certificates. Revocation checks require Admin
+            # credentials and are therefore unavailable in this branch.
+            from google.auth.transport.requests import Request
+            from google.oauth2 import id_token
+
+            decoded = id_token.verify_firebase_token(
+                token,
+                Request(),
+                audience=project_id,
+            )
         uid = decoded.get("uid") or decoded.get("sub")
         if not uid:
             raise ValueError("Firebase token does not contain a user id")
@@ -60,6 +79,7 @@ def _verify_firebase_token(token: str) -> AuthenticatedUser:
     except HTTPException:
         raise
     except Exception as exc:
+        logger.warning("Firebase ID token verification failed (%s): %s", type(exc).__name__, exc)
         raise HTTPException(status_code=401, detail="Invalid or expired authentication token") from exc
 
 

@@ -16,7 +16,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: LLM_MODEL
-        value: gemini-2.5-flash
+        value: gemini-3.6-flash
       - key: OPENAI_API_KEY
         sync: false            # only needed for Whisper voice transcription
       - key: LANGSMITH_TRACING
@@ -46,4 +46,6 @@ services:
       - key: SWIGGY_TOKEN_ENCRYPTION_KEY
         sync: false
       - key: SWIGGY_REDIRECT_URI
-        value: https://gangu-api.onrender.com/api/auth/callback/swiggy
+        sync: false           # actual deployed HTTPS origin + /api/auth/callback/swiggy
+      - key: SWIGGY_CLIENT_ID
+        sync: false           # registered OAuth client ID matching this redirect URI

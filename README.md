@@ -1,7 +1,7 @@
 # GANGU 🛒
 
-> **Voice-first grocery assistant for elderly Indian users.**
-> Speak in Hindi, English, or Hinglish — GANGU's AI agents search Zepto & Swiggy Instamart, compare options, apply safety policies, and place the order for you.
+> **Voice-first grocery assistance designed for older Indian adults and their families.**
+> Speak or type in Hindi, English, or Hinglish, compare the available results, and explicitly review an option before confirming it. Development and estimated data are labelled in the interface.
 
 ```
 "doodh khatam ho gaya, le aao"
@@ -22,8 +22,8 @@ GANGU is a multi-agent AI system built on **LangGraph**, powered by **Google Gem
 2. 6 AI agents work in a sequential pipeline, each with one job
 3. Products are found on **Zepto** and **Swiggy Instamart** (via MCP clients)
 4. The best option is selected using a weighted scoring model + safety checks
-5. Order is placed on Zepto via Cash on Delivery (or user confirms first)
-6. A friendly Hindi/Hinglish response is sent back
+5. The user reviews the option, address, price source and transaction mode
+6. Confirmation remains a safe simulation unless every production purchase safeguard is deliberately enabled
 
 ---
 
@@ -60,8 +60,8 @@ GANGU/
 │   ├── app/
 │   │   ├── page.tsx               # Public landing page
 │   │   ├── layout.tsx             # Root layout
-│   │   ├── signin/page.tsx        # Sign-in (phone OTP + Google + WhatsApp)
-│   │   ├── signup/page.tsx        # Sign-up
+│   │   ├── signin/page.tsx        # Redirects to the shared Firebase sign-in flow
+│   │   ├── signup/page.tsx        # Firebase phone OTP + Google sign-in
 │   │   └── (authenticated)/       # Protected routes — auto-redirects to /signin
 │   │       └── app/
 │   │           ├── page.tsx       # Main workspace (voice/text + agent timeline)
@@ -70,8 +70,7 @@ GANGU/
 │   │           ├── family/        # Family member management
 │   │           └── settings/      # Preferences, address, payment, accessibility
 │   ├── components/
-│   │   ├── landing/               # Hero, FAQ, Testimonials, Pricing, ComparisonMatrix
-│   │   ├── auth/                  # PhoneOtpForm, Google & WhatsApp buttons
+│   │   ├── auth/                  # Global Firebase session synchronisation
 │   │   ├── app/                   # AppShell, LeftRail, MobileNav, TodayPanel, etc.
 │   │   └── *.tsx                  # VoiceInput, AgentTimeline, ProductComparison, Toast
 │   ├── lib/
@@ -224,7 +223,7 @@ cd api && python main.py          # → http://localhost:8000
 cd frontend && npm run dev        # → http://localhost:3000
 ```
 
-Open **http://localhost:3000** → **Get Started** → phone + OTP `123456` (dev mock).
+Open **http://localhost:3000** → **Sign in**. Phone OTP and Google use Firebase Authentication; there is no development OTP or mock social login. Enable the providers and authorize the domain in Firebase Console before testing.
 
 ### One-command start (optional)
 
@@ -273,7 +272,15 @@ ENABLE_REAL_PURCHASES=false
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_WS_URL=ws://localhost:8000
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_web_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_web_app_id
 ```
+
+In Firebase Console, enable **Google** and **Phone** under Authentication > Sign-in method. Add `localhost` for local development and the exact Vercel production hostname under Authentication > Settings > Authorized domains. The backend `FIREBASE_PROJECT_ID` must identify the same Firebase project. Firebase web configuration is public app metadata; never place an Admin SDK private key or service-account JSON in `NEXT_PUBLIC_*` variables.
 
 ---
 
@@ -281,14 +288,14 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 
 | Route | Description |
 |---|---|
-| `/` | Public landing — aurora hero · trust strip · comparison matrix · FAQ · mobile drawer |
-| `/signin` | Sign in — phone + OTP · Google · WhatsApp (social auth mocked in dev) |
-| `/signup` | New user registration |
-| `/app` | Workspace — voice/text input · idle "breathing" mic · live agent timeline · today panel · quick re-order |
-| `/app/orders` | Past orders with platform filter + pipeline replay |
-| `/app/lists` | Saved shopping lists — dispatch a whole list in one tap |
-| `/app/family` | Invite & manage family members with permissions |
-| `/app/settings` | Language · address · payment · accessibility · privacy · **draft → save bar → toast** |
+| `/` | Public, consumer-facing product explanation with honest live/demo boundaries |
+| `/signin` | Redirect to the real Firebase authentication screen |
+| `/signup` | Firebase phone OTP and Google authentication |
+| `/app` | Voice/text request, transparent progress, comparison and explicit final review |
+| `/app/orders` | Browser-local order records; provider history is not yet synchronized |
+| `/app/lists` | Browser-local saved lists that prepare a new request for review |
+| `/app/family` | Browser-local household contacts; no invitation or access grant is sent |
+| `/app/settings` | Browser-local language, address, payment and accessibility preferences |
 
 All `/app/*` routes are inside the `(authenticated)` route group and auto-redirect to `/signin` if the user is not logged in.
 
@@ -309,7 +316,7 @@ All `/app/*` routes are inside the `(authenticated)` route group and auto-redire
 | `GET` | `/api/history` | Fetch order history |
 | `WS` | `/ws/{session_id}` | Session-scoped agent updates; requires a short-lived ticket |
 
-For local development, `GANGU_STATE_BACKEND=memory` keeps session and OAuth state in-process. Production deployments should use `GANGU_STATE_BACKEND=mongodb`; this makes session ownership and one-time quotes safe across workers and stores Swiggy OAuth tokens encrypted with `SWIGGY_TOKEN_ENCRYPTION_KEY`.
+For local development and the current single-worker Render setup, `GANGU_STATE_BACKEND=memory` keeps session and OAuth state in-process. A multi-worker production deployment should use `GANGU_STATE_BACKEND=mongodb`; this makes session ownership and one-time quotes safe across workers and stores Swiggy OAuth tokens encrypted with `SWIGGY_TOKEN_ENCRYPTION_KEY`.
 
 The exact redirect URI to send Swiggy is your deployed API origin plus `/api/auth/callback/swiggy`, for example `https://api.example.com/api/auth/callback/swiggy`. The same full value must be configured in `SWIGGY_REDIRECT_URI`.
 
@@ -388,20 +395,20 @@ The confirmation endpoint checks this flag before any platform call. When `true`
 - Backend Firebase token verification and session-scoped WebSockets
 - One-time quote → explicit confirmation transaction boundary
 - Next.js frontend: landing · auth · workspace · 4 sub-routes
-- Investor-ready landing (aurora hero · trust strip · comparison matrix · mobile drawer)
+- Calm, accessible consumer landing and authenticated workspace
 - Firebase Google and phone authentication in the active sign-in route
 - Settings draft/save UX with toasts
-- Idle "breathing" mic animation + global toast system
+- Real Firebase session synchronization, token refresh and global toast system
 
 ### ⚠️ Not Yet / Stubs
-- Durable MongoDB/Redis persistence for sessions, quotes, orders, and idempotency
+- Durable production persistence for orders, lists, contacts, preferences and idempotency
 - Swiggy live MCP credentials and OAuth redirect flow (awaiting Swiggy approval)
 - Zepto live MCP checkout; current catalog data is labelled as estimated
 - Backend persistence for family members + saved lists (localStorage only)
 - Amazon MCP client (`amazon_mcp_client.py` is an empty stub)
 - BigBasket / JioMart / Dunzo MCP clients
 - RAG-based `query_info_only` agent (placeholder message only)
-- Gemini API keys moved out of source code into `.env`
+- Complete authenticated end-to-end production verification using a real Firebase user
 
 ---
 

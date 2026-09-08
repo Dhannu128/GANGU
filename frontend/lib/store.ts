@@ -50,6 +50,7 @@ export interface User {
 }
 
 export interface AuthState {
+  initialized: boolean
   isAuthenticated: boolean
   token: string | null
 }
@@ -130,7 +131,7 @@ interface GANGUStore {
   auth: AuthState
   user: User | null
 
-  // App data (mock)
+  // App data persisted on this browser until server-side persistence is available
   pastOrders: PastOrder[]
   savedLists: SavedList[]
   familyMembers: FamilyMember[]
@@ -158,6 +159,7 @@ interface GANGUStore {
 
   // Auth actions
   signIn: (user: User, token: string) => void
+  setAuthInitialized: (initialized: boolean) => void
   signOut: () => void
   updateSettings: (patch: Partial<Settings>) => void
   updateUser: (patch: Partial<User>) => void
@@ -172,62 +174,10 @@ interface GANGUStore {
   dismissToast: (id: number) => void
 }
 
-const DEMO_PAST_ORDERS: PastOrder[] = [
-  {
-    id: 'ORD-2026-0418',
-    date: '2026-04-24',
-    itemSummary: 'Aashirvaad Atta 5 kg',
-    platform: 'Zepto',
-    total: 285,
-    status: 'delivered',
-  },
-  {
-    id: 'ORD-2026-0411',
-    date: '2026-04-21',
-    itemSummary: 'Amul Taaza Milk 1 L · Britannia bread',
-    platform: 'Zepto',
-    total: 96,
-    status: 'delivered',
-  },
-  {
-    id: 'ORD-2026-0402',
-    date: '2026-04-19',
-    itemSummary: 'Tata Tea Premium 500 g',
-    platform: 'Amazon',
-    total: 240,
-    status: 'delivered',
-  },
-  {
-    id: 'ORD-2026-0394',
-    date: '2026-04-15',
-    itemSummary: 'Toor Dal 1 kg · Chana 1 kg',
-    platform: 'Zepto',
-    total: 198,
-    status: 'delivered',
-  },
-]
-
-const DEMO_LISTS: SavedList[] = [
-  { id: 'list-1', name: 'Weekly basics', items: ['Atta 5 kg', 'Milk 1 L', 'Bread'], lastUsed: '2026-04-21' },
-  { id: 'list-2', name: 'Morning chai', items: ['Tata Tea 500 g', 'Sugar 1 kg', 'Elaichi 50 g'] },
-  { id: 'list-3', name: 'Festival cooking', items: ['Ghee 1 L', 'Kaju 250 g', 'Kishmish 200 g', 'Cardamom'] },
-]
-
-const DEMO_FAMILY: FamilyMember[] = [
-  {
-    id: 'fam-1',
-    name: 'Aarav (Grandson)',
-    relationship: 'Grandson',
-    phone: '+91 98xxxxxx21',
-    lastActive: '2 hours ago',
-    permissions: ['view', 'order', 'pay'],
-  },
-]
-
 const DEFAULT_SETTINGS: Settings = {
   language: 'hinglish',
-  address: 'Home · 12, Rose Apt, Indore 452001',
-  paymentMethod: 'upi',
+  address: '',
+  paymentMethod: 'cod',
   voiceSpeed: 'normal',
   largerText: false,
   higherContrast: false,
@@ -253,7 +203,7 @@ export const useGANGUStore = create<GANGUStore>()(
       isCancelled: false,
       abortController: null,
 
-      auth: { isAuthenticated: false, token: null },
+      auth: { initialized: false, isAuthenticated: false, token: null },
       user: null,
 
       pastOrders: [],
@@ -316,20 +266,23 @@ export const useGANGUStore = create<GANGUStore>()(
         set((state) => {
           const returningUser = state.user?.id === user.id
           return {
-            auth: { isAuthenticated: true, token },
+            auth: { initialized: true, isAuthenticated: true, token },
             user,
             settings: returningUser
               ? state.settings
               : { ...DEFAULT_SETTINGS, language: user.language, address: user.address },
-            pastOrders: state.pastOrders.length ? state.pastOrders : DEMO_PAST_ORDERS,
-            savedLists: state.savedLists.length ? state.savedLists : DEMO_LISTS,
-            familyMembers: state.familyMembers.length ? state.familyMembers : DEMO_FAMILY,
+            pastOrders: returningUser ? state.pastOrders : [],
+            savedLists: returningUser ? state.savedLists : [],
+            familyMembers: returningUser ? state.familyMembers : [],
           }
         }),
 
+      setAuthInitialized: (initialized) =>
+        set((state) => ({ auth: { ...state.auth, initialized } })),
+
       signOut: () =>
         set({
-          auth: { isAuthenticated: false, token: null },
+          auth: { initialized: true, isAuthenticated: false, token: null },
           user: null,
           pastOrders: [],
           savedLists: [],

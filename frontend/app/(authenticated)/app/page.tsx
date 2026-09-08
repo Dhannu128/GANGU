@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useGANGUStore } from '@/lib/store'
-import { processUserInput, confirmOrder } from '@/lib/api'
+import { processUserInput, confirmOrder, requestErrorMessage } from '@/lib/api'
 import VoiceInput from '@/components/VoiceInput'
 import TextInput from '@/components/TextInput'
 import AgentTimeline from '@/components/AgentTimeline'
@@ -13,6 +13,7 @@ import Greeting from '@/components/app/Greeting'
 import TodayPanel from '@/components/app/TodayPanel'
 import QuickReorder from '@/components/app/QuickReorder'
 import EmptyState from '@/components/app/EmptyState'
+import { AlertCircle, WifiOff } from 'lucide-react'
 
 interface RawProduct {
   name?: string
@@ -52,6 +53,8 @@ export default function AppHome() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [selectedProductIndex, setSelectedProductIndex] = useState(0)
   const [quoteId, setQuoteId] = useState<string | null>(null)
+  const [requestError, setRequestError] = useState('')
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
 
   // Abort controller for the in-flight chat/process request, so cancel can
   // tear down the HTTP request immediately instead of waiting for the
@@ -60,12 +63,23 @@ export default function AppHome() {
   const { setAbortController } = useGANGUStore()
 
   useEffect(() => {
+    const online = () => setIsOnline(true)
+    const offline = () => setIsOnline(false)
+    window.addEventListener('online', online)
+    window.addEventListener('offline', offline)
     return () => {
       abortRef.current?.abort()
+      window.removeEventListener('online', online)
+      window.removeEventListener('offline', offline)
     }
   }, [])
 
   const handleUserInput = async (message: string) => {
+    if (!navigator.onLine) {
+      setRequestError('You are offline. Reconnect to the internet and try again.')
+      return
+    }
+    setRequestError('')
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -131,7 +145,7 @@ export default function AppHome() {
         // Cancelled by user — silent, store already updated by handleCancel.
       } else {
         console.error('Error processing input:', error)
-        alert('Sorry, something went wrong. Please try again.')
+        setRequestError(requestErrorMessage(error))
       }
     } finally {
       setProcessing(false)
@@ -145,6 +159,11 @@ export default function AppHome() {
   const handleConfirmOrder = async () => {
     try {
       if (!sessionId || !quoteId) return
+      if (!settings.address.trim()) {
+        setRequestError('Add a delivery address in Settings before confirming.')
+        return
+      }
+      setRequestError('')
       const result = await confirmOrder(
         sessionId,
         quoteId,
@@ -158,7 +177,7 @@ export default function AppHome() {
       }
     } catch (error) {
       console.error('Error confirming order:', error)
-      alert('Failed to place order. Please try again.')
+      setRequestError('We could not verify the order result. Check your provider order history before trying again.')
     }
   }
 
@@ -178,6 +197,12 @@ export default function AppHome() {
   return (
     <main className="min-h-screen pb-12">
       <div className="max-w-7xl mx-auto px-5 md:px-8 pt-8 md:pt-10">
+        {!isOnline && (
+          <div className="status-notice offline" role="status"><WifiOff aria-hidden /><span><strong>You are offline.</strong> Voice and product search will work again after you reconnect.</span></div>
+        )}
+        {requestError && (
+          <div className="status-notice error" role="alert"><AlertCircle aria-hidden /><span>{requestError}</span><button onClick={() => setRequestError('')} aria-label="Dismiss error">Dismiss</button></div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* CENTER */}
           <div className="lg:col-span-2 order-2 lg:order-1">

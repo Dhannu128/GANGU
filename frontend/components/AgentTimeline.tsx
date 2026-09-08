@@ -1,17 +1,17 @@
 'use client'
 
 import { useGANGUStore } from '@/lib/store'
-import { Check, Loader, X, Sparkles, Brain, ListChecks, Search, Scale, Wand2, ShoppingBag, Bell, AlertTriangle } from 'lucide-react'
+import { Check, Loader, X, ClipboardList, Brain, ListChecks, Search, Scale, BadgeCheck, ShoppingBag, Bell, AlertTriangle } from 'lucide-react'
 import { cancelProcessing } from '@/lib/api'
 import { useState } from 'react'
 
 const STEP_META: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; tint: string }> = {
-  init:               { label: 'Initializing',         icon: Sparkles,      tint: 'slate' },
+  init:               { label: 'Getting ready',         icon: ClipboardList, tint: 'slate' },
   intent_extraction:  { label: 'Understanding request', icon: Brain,         tint: 'amber' },
   task_planning:      { label: 'Planning tasks',        icon: ListChecks,    tint: 'amber' },
   search:             { label: 'Searching platforms',   icon: Search,        tint: 'cyan' },
   comparison:         { label: 'Comparing products',    icon: Scale,         tint: 'violet' },
-  decision:           { label: 'Selecting best option', icon: Wand2,         tint: 'violet' },
+  decision:           { label: 'Selecting best option', icon: BadgeCheck,    tint: 'violet' },
   purchase:           { label: 'Processing order',      icon: ShoppingBag,   tint: 'emerald' },
   notification:       { label: 'Sending confirmation',  icon: Bell,          tint: 'emerald' },
   error:              { label: 'Error occurred',        icon: AlertTriangle, tint: 'rose' },
@@ -71,7 +71,7 @@ export default function AgentTimeline() {
     return (
       <div className="surface-card p-7 animate-fade-in">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Agent Pipeline</h3>
+          <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Request progress</h3>
           <span className="pill-slate">
             <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
             Idle
@@ -79,11 +79,11 @@ export default function AgentTimeline() {
         </div>
 
         <div className="text-center py-8">
-          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-amber-500/15 to-violet-500/10 border border-white/10 flex items-center justify-center">
-            <Sparkles className="w-7 h-7 text-amber-300" />
+          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+            <ClipboardList className="w-7 h-7 text-emerald-700" />
           </div>
           <p className="text-base font-semibold text-slate-200 mb-1">Ready when you are</p>
-          <p className="text-sm text-slate-500">Six AI agents will appear here once you make a request.</p>
+          <p className="text-sm text-slate-500">You will see each check here after making a request.</p>
         </div>
 
         {/* Skeleton preview */}
@@ -100,7 +100,7 @@ export default function AgentTimeline() {
               </div>
             )
           })}
-          <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold text-center pt-2">+ 3 more agents</p>
+          <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold text-center pt-2">+ 3 more checks</p>
         </div>
       </div>
     )
@@ -122,8 +122,8 @@ export default function AgentTimeline() {
     : hasError
     ? 'Issue occurred'
     : allComplete
-    ? 'All agents done'
-    : 'Agents working'
+    ? 'All checks done'
+    : 'Working'
 
   const headerPill = isCancelling
     ? 'pill-rose'
@@ -137,7 +137,7 @@ export default function AgentTimeline() {
     <div className="surface-card p-7 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Agent Pipeline</h3>
+        <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Request progress</h3>
         <span className={headerPill}>
           {!allComplete && !hasError && !isCancelling && (
             <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse"></span>
@@ -178,9 +178,9 @@ export default function AgentTimeline() {
       <div className="mb-6">
         <div className="flex justify-between items-end mb-2">
           <span className="text-xs text-slate-500 font-medium">
-            {completedCount} of {totalSteps} agents
+            {completedCount} of {totalSteps} checks
           </span>
-          <span className="text-xl font-display font-extrabold gradient-text-warm">
+          <span className="text-xl font-display font-extrabold text-emerald-800">
             {progress}%
           </span>
         </div>
@@ -189,7 +189,7 @@ export default function AgentTimeline() {
             className="h-full rounded-full transition-all duration-700 ease-out shimmer"
             style={{
               width: `${progress}%`,
-              background: 'linear-gradient(90deg, #FB923C 0%, #F472B6 50%, #A78BFA 100%)',
+              background: '#2f6b4f',
             }}
           />
         </div>
@@ -197,7 +197,7 @@ export default function AgentTimeline() {
 
       {/* Timeline */}
       <div className="relative">
-        <div className="absolute left-[19px] top-2 bottom-2 w-px bg-gradient-to-b from-white/10 via-white/5 to-transparent" />
+        <div className="absolute left-[19px] top-2 bottom-2 w-px bg-emerald-900/15" />
 
         <div className="space-y-2.5">
           {STEP_ORDER.map((stepKey) => {

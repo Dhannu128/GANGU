@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useGANGUStore, type PastOrder } from '@/lib/store'
-import { Package, Truck, ShieldCheck, ChevronRight, Check, RotateCcw, Filter, Calendar } from 'lucide-react'
+import { Package, Truck, ShieldCheck, ChevronRight, Check, Filter, Calendar } from 'lucide-react'
 
 const STATUS_META: Record<PastOrder['status'], { label: string; pill: string }> = {
   delivered:   { label: 'Delivered',   pill: 'pill-emerald' },
@@ -30,9 +30,10 @@ export default function OrdersPage() {
         <header className="mb-8">
           <span className="pill-amber mb-3 inline-flex">
             <Package className="w-3 h-3" />
-            Order history
+            Local history
           </span>
-          <h1 className="text-display text-3xl md:text-4xl mb-2">Past orders</h1>
+          <h1 className="text-display text-3xl md:text-4xl mb-2">Order records</h1>
+          <p className="text-slate-500 text-sm mb-2">Shown from this browser only. Provider order history is not synced yet.</p>
           <p className="text-slate-400">
             {filtered.length} {filtered.length === 1 ? 'order' : 'orders'}
             <span className="text-slate-700 mx-2">·</span>
@@ -65,7 +66,7 @@ export default function OrdersPage() {
         {filtered.length === 0 ? (
           <div className="surface-card p-10 text-center">
             <Package className="w-10 h-10 mx-auto mb-4 text-slate-700" />
-            <p className="text-slate-400">No orders yet. Start with your first one!</p>
+            <p className="text-slate-400">No order records have been saved in this browser.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -107,7 +108,7 @@ export default function OrdersPage() {
                     </div>
 
                     <div className="col-span-4 md:col-span-1 text-right md:text-left">
-                      <p className="text-base font-display font-extrabold gradient-text-warm">₹{order.total}</p>
+                      <p className="text-base font-display font-extrabold text-emerald-800">₹{order.total}</p>
                     </div>
 
                     <div className="col-span-3 md:col-span-1">
@@ -130,16 +131,10 @@ export default function OrdersPage() {
                     <div className="px-5 pb-5 pt-1 border-t border-white/5 animate-fade-in">
                       <p className="text-xs uppercase tracking-widest font-bold text-slate-500 mb-3 mt-4 inline-flex items-center gap-1.5">
                         <ShieldCheck className="w-3 h-3" />
-                        Pipeline replay
+                        Recorded progress
                       </p>
                       <div className="space-y-2">
-                        {[
-                          'Understanding request',
-                          'Searching platforms',
-                          'Comparing products',
-                          'Selected best option',
-                          'Order placed',
-                        ].map((step, i) => (
+                        {(order.steps ?? []).map((step, i) => (
                           <div
                             key={i}
                             className="flex items-center gap-3 px-3 py-2 rounded-xl bg-emerald-500/[0.04] border border-emerald-500/20"
@@ -147,18 +142,12 @@ export default function OrdersPage() {
                             <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center">
                               <Check className="w-3.5 h-3.5 text-emerald-300" strokeWidth={3} />
                             </div>
-                            <span className="text-sm text-emerald-200 font-semibold">{step}</span>
+                            <span className="text-sm text-emerald-200 font-semibold">{step.message || step.step}</span>
                           </div>
                         ))}
-                      </div>
-
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        <button className="btn-primary text-sm">
-                          <RotateCcw className="w-4 h-4" />
-                          Re-order
-                        </button>
-                        <button className="btn-secondary text-sm">View invoice</button>
-                        <button className="btn-ghost text-sm">Report issue</button>
+                        {!order.steps?.length && (
+                          <p className="text-sm text-slate-500">Detailed progress was not recorded for this entry.</p>
+                        )}
                       </div>
                     </div>
                   )}

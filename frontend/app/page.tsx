@@ -1,333 +1,309 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useGANGUStore } from '@/lib/store'
-import Logo from '@/components/Logo'
-import DemoStrip from '@/components/landing/DemoStrip'
-import Testimonials from '@/components/landing/Testimonials'
-import Pricing from '@/components/landing/Pricing'
-import FAQ from '@/components/landing/FAQ'
-import TrustStrip from '@/components/landing/TrustStrip'
-import BuiltWithBar from '@/components/landing/BuiltWithBar'
-import ComparisonMatrix from '@/components/landing/ComparisonMatrix'
-import MobileNav from '@/components/landing/MobileNav'
 import {
-  Mic,
-  Sparkles,
-  Zap,
-  ShieldCheck,
-  Globe2,
-  ArrowRight,
-  Bot,
-  HeartHandshake,
+  ArrowRight, BadgeCheck, Check, ChevronDown, Eye, Globe2,
+  ListChecks, LockKeyhole, Menu, Mic, Pause, Play, Search, ShieldCheck,
+  ShoppingBasket, Smartphone, Users,
 } from 'lucide-react'
+import Logo from '@/components/Logo'
+import { useGANGUStore } from '@/lib/store'
 
-const PLATFORMS = ['Swiggy Instamart', 'Zepto', 'Amazon', 'BigBasket', 'JioMart', 'Dunzo']
-
-const HOW_IT_WORKS = [
+const SAMPLE_REQUESTS = [
   {
-    icon: Mic,
-    title: 'Speak naturally',
-    desc: 'Tap the mic and say what you need — in Hindi, English, or Hinglish. No menus, no forms.',
+    label: 'Morning basics', request: '“Do kilo atta aur ek litre doodh”',
+    result: '2 items understood', detail: 'Atta · 2 kg  /  Milk · 1 litre', note: 'Quantities retained',
   },
   {
-    icon: Bot,
-    title: 'AI does the work',
-    desc: 'Six specialized agents understand your request, search every platform, and pick the best deal in seconds.',
+    label: 'Breakfast help', request: '“Diabetes-friendly breakfast items”',
+    result: 'Preference understood', detail: 'Lower-sugar options · final review required', note: 'Preference stays visible',
   },
   {
-    icon: Zap,
-    title: 'Order in one tap',
-    desc: 'Review the recommended option, confirm with a tap. GANGU places the order. Delivered in minutes.',
+    label: 'Weekly repeat', request: '“Repeat my weekly grocery list”',
+    result: 'Saved list prepared', detail: '6 browser-saved items · fully editable', note: 'No order is placed',
   },
-]
+] as const
 
 const FEATURES = [
   {
-    icon: HeartHandshake,
-    title: 'Designed for elders',
-    desc: 'Calm interface. Big tap targets. Voice-first. Built for the people tech often forgets.',
-    tint: 'amber',
+    icon: Mic, title: 'Ask naturally',
+    copy: 'Speak or type in Hindi, English, or Hinglish without learning commands or navigating complicated menus.',
+    example: '“Aadha kilo dal aur chai patti”', result: 'Everyday words become a clear request',
+    facts: ['Voice and text', 'Mixed-language input'], status: 'Available now', tone: 'saffron',
   },
   {
-    icon: Globe2,
-    title: 'हिंदी · English · Hinglish',
-    desc: 'Talk the way you talk at home. Our intent agent understands all three, mixed naturally.',
-    tint: 'violet',
+    icon: Search, title: 'Understand and compare',
+    copy: 'GANGU structures quantities and preferences, then explains price, source, delivery estimate, and why an option was suggested.',
+    example: '₹119 · estimated · source shown', result: 'Choices keep their context',
+    facts: ['Ambiguity checked', 'Source labelled'], status: 'Provider dependent', tone: 'indigo',
   },
   {
-    icon: ShieldCheck,
-    title: 'Safe by default',
-    desc: 'Six decision policies protect every order — confidence checks, stock verification, elderly safeguards.',
-    tint: 'emerald',
+    icon: BadgeCheck, title: 'Review and confirm',
+    copy: 'Product, address, payment preference, and transaction mode appear together before any final confirmation.',
+    example: 'Product · address · payment · mode', result: 'You make the final decision',
+    facts: ['Review required', 'No automatic purchase'], status: 'Available now', tone: 'teal',
   },
-]
+  {
+    icon: Eye, title: 'Accessible and secure',
+    copy: 'Larger text, higher contrast, Firebase sign-in, and verified backend tokens reduce effort while protecting requests.',
+    example: 'Google or phone OTP · comfort controls', result: 'Less strain and clearer control',
+    facts: ['Saved preference', 'Verified sign-in'], status: 'Available now', tone: 'green',
+  },
+] as const
+
+const HOW_STEPS = [
+  { number: '01', title: 'Say or type your list', copy: 'Use everyday language—short and mixed-language requests are welcome.', traceTitle: 'Request captured', traceCopy: '“2 kg atta aur 1 litre doodh”', facts: ['Voice or text', 'Hindi · English · Hinglish'], icon: Mic, tone: 'saffron' },
+  { number: '02', title: 'GANGU understands the need', copy: 'The request becomes a structured grocery list so you can spot mistakes before a search begins.', traceTitle: 'Intent understood', traceCopy: 'Atta · 2 kg  /  Milk · 1 litre', facts: ['Quantities retained', 'Ambiguity checked'], icon: ListChecks, tone: 'indigo' },
+  { number: '03', title: 'Available choices are compared', copy: 'Results retain their price source, delivery estimate, and live or estimated status.', traceTitle: 'Options compared', traceCopy: '3 options · suggested ₹119', facts: ['Source labelled', 'Reason shown'], icon: Search, tone: 'teal' },
+  { number: '04', title: 'You review and decide', copy: 'The important details appear together. Safe demo mode cannot place a real order.', traceTitle: 'Waiting for you', traceCopy: 'Final confirmation required', facts: ['Address checked', 'No automatic purchase'], icon: BadgeCheck, tone: 'green' },
+] as const
+
+const FAQS = [
+  ['Does GANGU place orders automatically?', 'No. Every option reaches a final review first. Real purchasing remains disabled unless the backend safety switches and verified live provider data are deliberately enabled.'],
+  ['Are prices and availability live?', 'Only when a connected provider returns verified live data. Estimated and demonstration results are labelled clearly and must not be treated as current store inventory.'],
+  ['Which languages can I use?', 'You can speak or type in Hindi, English, or natural Hinglish. Speech recognition quality still depends on your browser and microphone.'],
+  ['Can I use GANGU without voice?', 'Yes. Text input is always available, including when speech recognition is unsupported or microphone permission is denied.'],
+  ['How does sign-in work?', 'Google sign-in and Indian mobile OTP use Firebase Authentication. The backend validates Firebase ID tokens before allowing protected requests.'],
+  ['Is the Swiggy integration live?', 'The OAuth callback and security preparation exist, but live Swiggy functionality depends on approval and credentials. Until then, GANGU does not imply that Swiggy checkout is available.'],
+] as const
 
 export default function Home() {
-  const { connected, auth } = useGANGUStore()
+  const auth = useGANGUStore((state) => state.auth)
+  const settings = useGANGUStore((state) => state.settings)
+  const updateSettings = useGANGUStore((state) => state.updateSettings)
+  const [activeSample, setActiveSample] = useState(0)
+  const [activeFeature, setActiveFeature] = useState(0)
+  const [activeTrace, setActiveTrace] = useState(0)
+  const [isTracePlaying, setIsTracePlaying] = useState(true)
+  const [isTraceVisible, setIsTraceVisible] = useState(false)
+  const howSectionRef = useRef<HTMLElement | null>(null)
+  const destination = auth.isAuthenticated ? '/app' : '/signup'
+  const actionLabel = auth.isAuthenticated ? 'Open GANGU' : 'Start with GANGU'
+  const ActiveFeatureIcon = FEATURES[activeFeature].icon
+  const ActiveTraceIcon = HOW_STEPS[activeTrace].icon
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('gangu-large-text', settings.largerText)
+    document.documentElement.classList.toggle('gangu-high-contrast', settings.higherContrast)
+    return () => document.documentElement.classList.remove('gangu-large-text', 'gangu-high-contrast')
+  }, [settings.largerText, settings.higherContrast])
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const followMotionPreference = () => {
+      if (media.matches) setIsTracePlaying(false)
+    }
+    followMotionPreference()
+    media.addEventListener('change', followMotionPreference)
+    return () => media.removeEventListener('change', followMotionPreference)
+  }, [])
+
+  useEffect(() => {
+    const section = howSectionRef.current
+    if (!section || !('IntersectionObserver' in window)) {
+      setIsTraceVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsTraceVisible(entry.isIntersecting),
+      { threshold: 0.35 },
+    )
+    observer.observe(section)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!isTracePlaying || !isTraceVisible) return
+    const timer = window.setInterval(
+      () => setActiveTrace((current) => (current + 1) % HOW_STEPS.length),
+      3600,
+    )
+    return () => window.clearInterval(timer)
+  }, [isTracePlaying, isTraceVisible])
+
+  const selectTrace = (index: number) => {
+    setActiveTrace(index)
+    setIsTracePlaying(false)
+  }
 
   return (
-    <main className="min-h-screen relative">
-      {/* TOP NAV */}
-      <nav className="sticky top-0 z-40 backdrop-blur-xl bg-ink-950/70 border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <Logo />
-            <div className="flex flex-col leading-none">
-              <span className="font-display font-extrabold text-lg tracking-tight">GANGU</span>
-              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-0.5">
-                grocery · by voice
-              </span>
+    <main className={`marketing-page home-page${settings.largerText ? ' home-page-large-text' : ''}${settings.higherContrast ? ' home-page-high-contrast' : ''}`}>
+      <header className="home-header">
+        <Link href="/" className="brand-lockup" aria-label="GANGU home">
+          <Logo size={40} /><span><strong>GANGU</strong><small>grocery help · by voice</small></span>
+        </Link>
+        <nav className="desktop-home-nav" aria-label="Main navigation">
+          <a href="#sample">Try a sample</a><a href="#features">Features</a><a href="#how">How it works</a><a href="#safety">Safety</a>
+        </nav>
+        <div className="header-actions">
+          {!auth.isAuthenticated && <Link href="/signin" className="header-signin">Sign in</Link>}
+          <Link href={destination} className="header-action">{auth.isAuthenticated ? 'Open GANGU' : 'Try GANGU'}</Link>
+          <details className="mobile-home-menu">
+            <summary aria-label="Open navigation"><Menu aria-hidden /></summary>
+            <div className="mobile-home-panel">
+              <div className="mobile-menu-title"><span>Explore GANGU</span></div>
+              <a href="#sample" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Try a sample</a>
+              <a href="#features" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Features</a>
+              <a href="#how" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>How it works</a>
+              <a href="#safety" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Safety</a>
+              <Link href={destination} onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>{actionLabel}</Link>
             </div>
-          </Link>
-
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#demo" className="hover:text-white transition-colors">Try it</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors">How it works</a>
-            <a href="#why-gangu" className="hover:text-white transition-colors">Why GANGU</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className={connected ? 'pill-emerald hidden sm:inline-flex' : 'pill-slate hidden sm:inline-flex'}>
-              <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-              {connected ? 'Live' : 'Offline'}
-            </span>
-            {auth.isAuthenticated ? (
-              <Link href="/app" className="btn-primary text-sm hidden md:inline-flex">
-                Open app
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            ) : (
-              <>
-                <Link href="/signin" className="btn-ghost text-sm hidden md:inline-flex">Sign in</Link>
-                <Link href="/signup" className="btn-primary text-sm hidden md:inline-flex">Get started</Link>
-              </>
-            )}
-            <MobileNav isAuthenticated={auth.isAuthenticated} />
-          </div>
+          </details>
         </div>
-      </nav>
+      </header>
 
-      {/* HERO */}
-      <section className="relative max-w-7xl mx-auto px-6 pt-20 md:pt-24 pb-12">
-        <div className="aurora-layer" aria-hidden="true" />
-        <div className="relative text-center max-w-4xl mx-auto animate-fade-in">
-          <span className="pill-amber mb-7 mx-auto inline-flex">
-            <Sparkles className="w-3.5 h-3.5" />
-            India&apos;s first voice-first grocery assistant
-          </span>
-
-          <h1 className="text-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl mb-7 leading-[0.95]">
-            Your voice.
-            <br />
-            <span className="gradient-text-warm">Your groceries.</span>
-          </h1>
-
-          <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Speak naturally. Six AI agents search every Indian grocery platform, pick the best deal, and order it for you in seconds.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href={auth.isAuthenticated ? '/app' : '/signup'} className="btn-primary pulse-glow text-base px-7 py-3.5">
-              <Mic className="w-4 h-4" />
-              {auth.isAuthenticated ? 'Open app' : 'Get started free'}
-            </Link>
-            <a href="#how-it-works" className="btn-secondary text-base px-7 py-3.5">
-              See how it works
-              <ArrowRight className="w-4 h-4" />
-            </a>
+      <section className="home-hero" aria-labelledby="home-title">
+        <div className="home-hero-copy">
+          <p className="eyebrow">Simple grocery help for everyday India</p>
+          <h1 id="home-title">Say what you need. Stay in control.</h1>
+          <p className="home-hero-lede">Speak or type your grocery list naturally. GANGU organizes it, explains the available choices, and always asks before anything happens.</p>
+          <div className="hero-actions">
+            <Link href={destination} className="primary-action"><Mic aria-hidden />{actionLabel}</Link>
+            <a href="#sample" className="secondary-action">Try a safe sample <ArrowRight aria-hidden /></a>
           </div>
+          <div className="language-line" aria-label="Supported languages"><Globe2 aria-hidden /><span><strong>हिन्दी</strong><i />English<i />Hinglish</span></div>
+          <p className="hero-control-note"><ShieldCheck aria-hidden /> No purchase without your explicit confirmation.</p>
+        </div>
 
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-slate-500 uppercase tracking-widest font-semibold">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Safe purchases
-            </span>
-            <span className="hidden sm:inline text-slate-700">·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <Bot className="w-3.5 h-3.5 text-amber-400" /> 6 AI agents
-            </span>
-            <span className="hidden sm:inline text-slate-700">·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-violet-400" /> 10-min delivery
-            </span>
+        <div id="sample" className="product-story" aria-label="Safe example request">
+          <div className="story-header"><div><span className="service-dot" /> Try a sample</div><span>No order placed</span></div>
+          <div className="story-samples" role="group" aria-label="Choose a sample grocery request">
+            {SAMPLE_REQUESTS.map((sample, index) => <button key={sample.label} type="button" aria-pressed={activeSample === index} onClick={() => setActiveSample(index)}>{sample.label}</button>)}
           </div>
+          <div className="story-body" aria-live="polite">
+            <div className="story-market-mark" aria-hidden><ShoppingBasket /><span>आज की सूची</span></div>
+            <div className="sample-request"><Mic aria-hidden /><span><small>You say or type</small><strong>{SAMPLE_REQUESTS[activeSample].request}</strong></span></div>
+            <div className="sample-result"><ListChecks aria-hidden /><span><small>GANGU understood</small><strong>{SAMPLE_REQUESTS[activeSample].result}</strong><p>{SAMPLE_REQUESTS[activeSample].detail}</p></span></div>
+            <div className="sample-note"><Check aria-hidden />{SAMPLE_REQUESTS[activeSample].note}</div>
+          </div>
+          <p className="story-caption">This preview explains the workflow. It does not use live provider data or place an order.</p>
         </div>
       </section>
 
-      {/* TRUST STRIP */}
-      <TrustStrip />
+      <section className="home-principles" aria-label="GANGU product principles">
+        <p>Made for real households</p>
+        <div><strong>Voice first</strong><span>with a clear text alternative</span></div>
+        <div><strong>Plain language</strong><span>instead of technical steps</span></div>
+        <div><strong>Honest labels</strong><span>for live, estimated, and demo data</span></div>
+      </section>
 
-      {/* LIVE DEMO STRIP */}
-      <div id="demo">
-        <DemoStrip />
-      </div>
-
-      {/* PLATFORMS MARQUEE */}
-      <section className="relative border-y border-white/5 bg-white/[0.012] py-7 overflow-hidden">
-        <p className="text-center text-[11px] text-slate-500 uppercase tracking-[0.25em] font-bold mb-5">
-          Searches across India&apos;s top grocery platforms
-        </p>
-        <div className="relative">
-          <div className="flex marquee-track gap-14 whitespace-nowrap font-display text-2xl md:text-3xl font-bold text-slate-700">
-            {[...PLATFORMS, ...PLATFORMS, ...PLATFORMS].map((p, i) => (
-              <span key={i} className="flex items-center gap-3">
-                {p}
-                <span className="text-amber-500/30">●</span>
-              </span>
-            ))}
+      <section id="features" className="home-section feature-section">
+        <div className="section-kicker"><p className="eyebrow">Four things that matter</p><span>Clear capabilities, without feature overload</span></div>
+        <div className="feature-heading"><h2>Less app to learn.<br />More useful help.</h2><p>Every part of GANGU supports one calm path: ask, understand, compare, and decide.</p></div>
+        <div className="feature-showcase">
+          <div className="feature-selector" role="group" aria-label="Explore GANGU capabilities">
+            {FEATURES.map((feature, index) => {
+              const Icon = feature.icon
+              return <button key={feature.title} type="button" aria-pressed={activeFeature === index} aria-controls="feature-detail" className={`feature-choice feature-choice-${feature.tone}`} onClick={() => setActiveFeature(index)}><span><Icon aria-hidden /></span><strong>{feature.title}</strong><small>{String(index + 1).padStart(2, '0')}</small></button>
+            })}
           </div>
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-ink-950 to-transparent" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-ink-950 to-transparent" />
+          <div id="feature-detail" role="region" aria-live="polite" className={`feature-stage feature-stage-${FEATURES[activeFeature].tone}`}>
+            <div className="feature-stage-top"><span>Capability {String(activeFeature + 1).padStart(2, '0')}</span><strong>{FEATURES[activeFeature].status}</strong></div>
+            <div className="feature-stage-icon"><ActiveFeatureIcon aria-hidden /></div>
+            <p className="feature-stage-label">{FEATURES[activeFeature].result}</p>
+            <h3>{FEATURES[activeFeature].title}</h3>
+            <p>{FEATURES[activeFeature].copy}</p>
+            <div className="feature-example"><span>In practice</span><strong>{FEATURES[activeFeature].example}</strong></div>
+            <div className="feature-stage-facts">{FEATURES[activeFeature].facts.map((fact) => <span key={fact}><Check aria-hidden />{fact}</span>)}</div>
+          </div>
+        </div>
+        <div className="supporting-features" aria-label="More GANGU features">
+          <span><ListChecks aria-hidden /><strong>Saved lists</strong> Browser-local and editable</span>
+          <span><Eye aria-hidden /><strong>Comfort controls</strong> Larger text and contrast</span>
+          <span><LockKeyhole aria-hidden /><strong>Secure sign-in</strong> Google and phone OTP</span>
+          <span><BadgeCheck aria-hidden /><strong>Visible progress</strong> No mystery spinner</span>
         </div>
       </section>
 
-      {/* BUILT WITH */}
-      <BuiltWithBar />
-
-      {/* HOW IT WORKS */}
-      <section id="how-it-works" className="relative max-w-7xl mx-auto px-6 py-24 scroll-mt-20">
-        <div className="text-center mb-14 max-w-2xl mx-auto">
-          <span className="pill-cyan mb-3 mx-auto inline-flex">How it works</span>
-          <h2 className="text-display text-4xl md:text-5xl mt-2 mb-3">
-            From voice to delivered, <br className="hidden md:block" />
-            <span className="gradient-text-cool">in three steps</span>
-          </h2>
-          <p className="text-slate-400 text-lg">No app to learn. No forms to fill. Just talk.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {HOW_IT_WORKS.map((step, i) => (
-            <div key={i} className="surface-card p-7 group transition-transform hover:-translate-y-1.5">
-              <div className="flex items-start justify-between mb-7">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30 flex items-center justify-center">
-                  <step.icon className="w-6 h-6 text-amber-300" strokeWidth={2} />
-                </div>
-                <span className="text-5xl font-display font-extrabold text-slate-800 group-hover:text-amber-500/40 transition-colors">
-                  0{i + 1}
-                </span>
-              </div>
-              <h3 className="text-xl font-display font-bold mb-2.5 tracking-tight">{step.title}</h3>
-              <p className="text-slate-400 leading-relaxed text-sm">{step.desc}</p>
+      <section id="how" ref={howSectionRef} className="home-section how-section" onFocusCapture={() => setIsTracePlaying(false)}>
+        <div className="how-intro">
+          <p className="eyebrow">Follow one request</p>
+          <h2>See how your words become a decision.</h2>
+          <p>Watch one request move through GANGU automatically, or pause and select any step to inspect it at your own pace.</p>
+          <div className="trace-playback">
+            <button type="button" aria-pressed={isTracePlaying} onClick={() => setIsTracePlaying((playing) => !playing)}>
+              {isTracePlaying ? <Pause aria-hidden /> : <Play aria-hidden />}
+              {isTracePlaying ? 'Pause trace' : 'Play trace'}
+            </button>
+            <span><i className={isTracePlaying ? 'running' : ''} />{isTracePlaying ? 'Running automatically' : 'Paused for you'}</span>
+          </div>
+          <div id="request-trace-detail" className={`request-trace trace-stage-${HOW_STEPS[activeTrace].tone}`} role="region" aria-live={isTracePlaying ? 'off' : 'polite'} aria-atomic="true" aria-label={`Selected request stage: ${HOW_STEPS[activeTrace].traceTitle}`}>
+            <div className="trace-auto-progress" aria-hidden><span key={activeTrace} className={isTracePlaying && isTraceVisible ? 'running' : ''} /></div>
+            <div className="trace-route" aria-hidden>
+              <span className="trace-route-fill" style={{ height: `${(activeTrace / (HOW_STEPS.length - 1)) * 100}%` }} />
+              {HOW_STEPS.map((step, index) => {
+                const Icon = step.icon
+                return <span key={step.number} className={`trace-node trace-node-${step.tone} ${index === activeTrace ? 'active' : ''} ${index < activeTrace ? 'complete' : ''}`}><Icon /></span>
+              })}
             </div>
+            <div className="trace-output">
+              <div className="trace-output-top"><span>Selected explanation</span><strong>{activeTrace + 1} / {HOW_STEPS.length}</strong></div>
+              <div className="trace-icon"><ActiveTraceIcon aria-hidden /></div>
+              <p>{HOW_STEPS[activeTrace].traceTitle}</p>
+              <h3>{HOW_STEPS[activeTrace].traceCopy}</h3>
+              <div className="trace-facts">{HOW_STEPS[activeTrace].facts.map((fact) => <span key={fact}><Check aria-hidden />{fact}</span>)}</div>
+            </div>
+            <p className="trace-caption">This is an explanation of the workflow, not a claim that live provider access is available.</p>
+          </div>
+        </div>
+        <ol className="how-timeline">
+          {HOW_STEPS.map((step, index) => (
+            <li key={step.number} className={`timeline-${step.tone} ${activeTrace === index ? 'active' : ''}`}>
+              <button type="button" aria-pressed={activeTrace === index} aria-controls="request-trace-detail" onClick={() => selectTrace(index)}>
+                <span className="step-marker"><step.icon aria-hidden /><b>{step.number}</b></span><div><h3>{step.title}</h3><p>{step.copy}</p><small>{activeTrace === index ? 'Selected stage' : 'Select to inspect this stage'} <ArrowRight aria-hidden /></small>{activeTrace === index && <div className="mobile-trace-detail"><strong>{step.traceTitle}</strong><span>{step.traceCopy}</span></div>}</div>
+              </button>
+            </li>
           ))}
+        </ol>
+      </section>
+
+      <section className="home-section access-section">
+        <div className="access-visual">
+          <p className="access-preview-label">Preview comfort controls</p>
+          <div className="access-phone" aria-hidden>
+            <span>GANGU</span><div className="access-mic"><Mic /></div><strong>Tap to speak</strong><small>or type your list below</small><div className="access-input">Atta, doodh, chai…</div>
+          </div>
+          <div className="comfort-controls" role="group" aria-label="Preview accessibility preferences">
+            <button type="button" aria-pressed={settings.largerText} onClick={() => updateSettings({ largerText: !settings.largerText })}><strong>Aa</strong> Larger text</button>
+            <button type="button" aria-pressed={settings.higherContrast} onClick={() => updateSettings({ higherContrast: !settings.higherContrast })}><Eye aria-hidden /> Higher contrast</button>
+          </div>
+          <p className="access-caption">These preferences are saved in this browser.</p>
+        </div>
+        <div className="access-copy">
+          <p className="eyebrow">Comfort is a product feature</p><h2>Designed for older adults—and everyone helping at home.</h2><p>Large touch targets, visible focus, readable text, and adjustable contrast reduce effort without making the product feel clinical.</p>
+          <ul>
+            <li><Smartphone aria-hidden /><span><strong>Works across screen sizes</strong>Clear navigation from a small phone to a desktop.</span></li>
+            <li><Eye aria-hidden /><span><strong>Preferences that reduce strain</strong>Larger text and higher contrast can be saved in this browser.</span></li>
+            <li><Users aria-hidden /><span><strong>Household contacts, honestly described</strong>Contacts are browser-local today; no invitation or account permission is sent.</span></li>
+          </ul>
         </div>
       </section>
 
-      {/* WHY GANGU */}
-      <section id="why-gangu" className="relative max-w-7xl mx-auto px-6 py-24 scroll-mt-20">
-        <div className="text-center mb-14 max-w-2xl mx-auto">
-          <span className="pill-violet mb-3 mx-auto inline-flex">Why GANGU</span>
-          <h2 className="text-display text-4xl md:text-5xl mt-2 mb-3">
-            Designed for the people <br className="hidden md:block" />
-            <span className="gradient-text">tech often forgets</span>
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {FEATURES.map((feature, i) => {
-            const Icon = feature.icon
-            const tintMap: Record<string, string> = {
-              amber: 'from-amber-500/20 to-orange-500/10 border-amber-500/30 text-amber-300',
-              violet: 'from-violet-500/20 to-fuchsia-500/10 border-violet-500/30 text-violet-300',
-              emerald: 'from-emerald-500/20 to-teal-500/10 border-emerald-500/30 text-emerald-300',
-            }
-            return (
-              <div key={i} className="surface-card p-7">
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br border flex items-center justify-center mb-6 ${tintMap[feature.tint]}`}>
-                  <Icon className="w-7 h-7" strokeWidth={2} />
-                </div>
-                <h3 className="text-xl font-display font-bold mb-2.5 tracking-tight">{feature.title}</h3>
-                <p className="text-slate-400 leading-relaxed text-sm">{feature.desc}</p>
-              </div>
-            )
-          })}
+      <section id="safety" className="home-section trust-section">
+        <div className="trust-heading"><p className="eyebrow">Safety without vague promises</p><h2>Know what works now—and what still needs access.</h2></div>
+        <div className="trust-ledger">
+          <article><LockKeyhole aria-hidden /><div><h3>Verified sign-in</h3><p>Google and phone OTP use Firebase. Protected API requests require a valid Firebase ID token.</p></div><span>Available now</span></article>
+          <article><BadgeCheck aria-hidden /><div><h3>Explicit final review</h3><p>The product, price, address, payment preference, and transaction mode are shown before confirmation.</p></div><span>Available now</span></article>
+          <article><ListChecks aria-hidden /><div><h3>Saved household data</h3><p>Lists, contacts, and comfort preferences on these screens are currently saved in this browser.</p></div><span className="local">On this device</span></article>
+          <article><ShoppingBasket aria-hidden /><div><h3>Swiggy provider connection</h3><p>Live access is awaiting approval and credentials. Estimated data is labelled and cannot silently become a real order.</p></div><span className="pending">Requires access</span></article>
         </div>
       </section>
 
-      {/* COMPARISON */}
-      <ComparisonMatrix />
-
-      {/* TESTIMONIALS */}
-      <Testimonials />
-
-      {/* PRICING */}
-      <Pricing />
-
-      {/* FAQ */}
-      <FAQ />
-
-      {/* CTA STRIP */}
-      <section className="relative max-w-7xl mx-auto px-6 py-12 md:py-16">
-        <div className="surface-card relative overflow-hidden p-10 md:p-14 text-center">
-          <div
-            className="absolute inset-0 pointer-events-none opacity-60"
-            style={{
-              background:
-                'radial-gradient(ellipse 600px 300px at 30% 20%, rgba(251, 146, 60, 0.18), transparent 60%), radial-gradient(ellipse 600px 300px at 70% 80%, rgba(139, 92, 246, 0.15), transparent 60%)',
-            }}
-          />
-          <div className="relative">
-            <h2 className="text-display text-3xl md:text-5xl mb-4">
-              Start ordering with your <span className="gradient-text-warm">voice today</span>
-            </h2>
-            <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto">
-              No signup forms. No credit card. Just your phone number and OTP.
-            </p>
-            <Link href={auth.isAuthenticated ? '/app' : '/signup'} className="btn-primary text-base px-8 py-3.5 inline-flex">
-              {auth.isAuthenticated ? 'Open app' : 'Get started free'}
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
+      <section id="faq" className="home-section faq-section">
+        <div className="faq-heading"><p className="eyebrow">Straight answers</p><h2>Before you begin</h2><p>What the current version can—and cannot—do.</p></div>
+        <div className="faq-list">{FAQS.map(([question, answer]) => <details key={question}><summary><span>{question}</span><ChevronDown aria-hidden /></summary><p>{answer}</p></details>)}</div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="border-t border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-16">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-10">
-            <div className="col-span-2">
-              <div className="flex items-center gap-2.5 mb-3">
-                <Logo size={30} />
-                <span className="font-display font-bold text-lg">GANGU</span>
-              </div>
-              <p className="text-sm text-slate-400 max-w-xs leading-relaxed">
-                Voice-first grocery shopping for everyone. Built in India, for India.
-              </p>
-            </div>
-            {[
-              { title: 'Product', links: ['Try it', 'How it works', 'Pricing', 'What\'s new'] },
-              { title: 'Company', links: ['About', 'Careers', 'Press', 'Contact'] },
-              { title: 'Trust', links: ['Privacy', 'Terms', 'Refund policy', 'Security'] },
-              { title: 'Reach us', links: ['help@gangu.in', 'WhatsApp support', 'Twitter', 'Instagram'] },
-            ].map((col, i) => (
-              <div key={i}>
-                <p className="text-xs uppercase tracking-widest font-bold text-slate-500 mb-4">
-                  {col.title}
-                </p>
-                <ul className="space-y-2.5">
-                  {col.links.map((l, j) => (
-                    <li key={j}>
-                      <a href="#" className="text-sm text-slate-400 hover:text-white transition-colors">
-                        {l}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-          <div className="pt-7 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-slate-500">
-              © 2026 GANGU Labs <span className="text-slate-700 mx-2">·</span> Built with{' '}
-              <span className="text-amber-400">♥</span> in India
-            </p>
-            <p className="text-xs text-slate-500">
-              हिंदी <span className="text-slate-700 mx-1.5">·</span> English{' '}
-              <span className="text-slate-700 mx-1.5">·</span> Hinglish
-            </p>
-          </div>
-        </div>
+      <section className="home-final-cta">
+        <div><p className="eyebrow">Start with one sentence</p><h2>Grocery help should feel this simple.</h2><p>Sign in securely, speak or type your list, and review every important detail before confirming.</p></div>
+        <Link href={destination} className="primary-action">{actionLabel}<ArrowRight aria-hidden /></Link>
+      </section>
+
+      <footer className="home-footer">
+        <div><div className="brand-lockup"><Logo size={34} /><span><strong>GANGU</strong><small>grocery help · by voice</small></span></div><p>Built in India for calmer, clearer grocery decisions.</p></div>
+        <nav aria-label="Footer navigation"><a href="#sample">Try a sample</a><a href="#features">Features</a><a href="#how">How it works</a><a href="#safety">Safety</a><a href="#faq">FAQ</a></nav>
+        <p className="product-status">Current status: live provider purchasing remains disabled until verified access and safeguards are complete.</p>
       </footer>
     </main>
   )

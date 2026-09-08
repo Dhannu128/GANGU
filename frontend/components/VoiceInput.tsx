@@ -44,16 +44,18 @@ function speechRecognitionConstructor(): SpeechRecognitionConstructor | undefine
 export default function VoiceInput({ onTranscription }: VoiceInputProps) {
   const { isListening, setListening, transcription, setTranscription, isProcessing, settings } = useGANGUStore()
   const [isSupported] = useState(() => Boolean(speechRecognitionConstructor()))
+  const [voiceError, setVoiceError] = useState('')
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const finalTextRef = useRef<string>('')
 
   const startListening = () => {
     const SR = speechRecognitionConstructor()
     if (!SR) {
-      alert('Voice input is not supported in this browser. Please use Chrome or Edge.')
+      setVoiceError('Voice input is unavailable in this browser. You can type your request below.')
       return
     }
 
+    setVoiceError('')
     finalTextRef.current = ''
     setTranscription('')
 
@@ -81,13 +83,16 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
     }
 
     recognition.onerror = (event: SpeechRecognitionErrorLike) => {
-      console.error('Speech recognition error:', event.error)
       if (event.error === 'no-speech') {
-        // benign — user tapped mic but didn't speak
+        setVoiceError('We did not hear anything. Tap the microphone and try again, or type below.')
       } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        alert('Microphone permission denied. Allow it in browser settings.')
+        setVoiceError('Microphone access is blocked. Select the site controls beside the address bar, allow Microphone, then try again—or type below.')
       } else if (event.error === 'network') {
-        alert('Voice service network error. Check your internet and try again.')
+        setVoiceError('Voice recognition could not reach the network. Check your connection or type below.')
+      } else if (event.error === 'aborted') {
+        setVoiceError('Voice input stopped. You can try again or type below.')
+      } else {
+        setVoiceError('Voice input could not start. Please try again or type your request below.')
       }
       setListening(false)
     }
@@ -102,8 +107,8 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
     try {
       recognition.start()
       setListening(true)
-    } catch (e) {
-      console.error('Failed to start recognition:', e)
+    } catch {
+      setVoiceError('The microphone could not start. Please try again or type below.')
       setListening(false)
     }
   }
@@ -138,6 +143,8 @@ export default function VoiceInput({ onTranscription }: VoiceInputProps) {
           {isListening ? <MicOff className="w-12 h-12" strokeWidth={2} /> : <Mic className="w-12 h-12" strokeWidth={2} />}
         </button>
       </div>
+
+      {voiceError && <p className="voice-error" role="alert">{voiceError}</p>}
 
       {/* Status */}
       <div className="text-center min-h-[68px]">

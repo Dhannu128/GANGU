@@ -11,9 +11,9 @@ const ICONS = {
 }
 
 const STYLES = {
-  success: 'border-emerald-500/40 bg-emerald-500/[0.08] text-emerald-200',
-  error:   'border-rose-500/40    bg-rose-500/[0.08]    text-rose-200',
-  info:    'border-amber-500/40   bg-amber-500/[0.08]   text-amber-200',
+  success: 'border-[#9ed7d0] bg-[#ddf3f0] text-[#0a4f4a]',
+  error:   'border-[#f2aaa3] bg-[#fde8e7] text-[#b42318]',
+  info:    'border-[#e2b860] bg-[#fff1d6] text-[#8a4b10]',
 }
 
 function ToastItem({ toast }: { toast: ToastType }) {
@@ -34,13 +34,13 @@ function ToastItem({ toast }: { toast: ToastType }) {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold leading-tight">{toast.title}</p>
         {toast.description && (
-          <p className="text-xs text-slate-300/80 mt-1 leading-relaxed">{toast.description}</p>
+          <p className="text-xs text-[#4f6072] mt-1 leading-relaxed">{toast.description}</p>
         )}
       </div>
       <button
         onClick={() => dismissToast(toast.id)}
         aria-label="Dismiss"
-        className="flex-shrink-0 text-slate-400 hover:text-white transition-colors"
+        className="flex-shrink-0 text-[#6a7a8c] hover:text-[#102033] transition-colors"
       >
         <X className="w-4 h-4" />
       </button>

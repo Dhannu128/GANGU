@@ -1,12 +1,45 @@
 from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
+import asyncio
+import httpx
 
 import pytest
 from fastapi import HTTPException
 from cryptography.fernet import Fernet
 
 from api import swiggy_oauth
+
+
+def test_callback_exchanges_json_and_stores_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    store = swiggy_oauth.SwiggyOAuthStore()
+    state, verifier = store.create_state("user-a")
+    monkeypatch.setattr(swiggy_oauth, "swiggy_oauth_store", store)
+    monkeypatch.setenv("SWIGGY_CLIENT_ID", "test-client")
+    monkeypatch.setenv("SWIGGY_REDIRECT_URI", "https://api.example.com/api/auth/callback/swiggy")
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def post(self, url, *, json):
+            assert json["code_verifier"] == verifier
+            assert json["code"] == "test-code"
+            assert json["redirect_uri"] == "https://api.example.com/api/auth/callback/swiggy"
+            return httpx.Response(200, json={"access_token": "test-token"}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(swiggy_oauth.httpx, "AsyncClient", Client)
+    assert asyncio.run(swiggy_oauth.exchange_callback("test-code", state)) == "user-a"
+    assert store.access_token_for("user-a") == "test-token"
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(swiggy_oauth.exchange_callback("test-code", state))
+    assert error.value.status_code == 400
 
 
 def test_oauth_configuration_requires_https_redirect(monkeypatch: pytest.MonkeyPatch) -> None:

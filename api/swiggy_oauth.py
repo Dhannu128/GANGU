@@ -206,7 +206,7 @@ async def exchange_callback(code: str, state: str) -> str:
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.post(
                 TOKEN_URL,
-                data={
+                json={
                     "grant_type": "authorization_code",
                     "code": code,
                     "code_verifier": pending.verifier,

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useGANGUStore, type SavedList } from '@/lib/store'
-import { ListOrdered, Plus, Send, Trash2, Sparkles, X } from 'lucide-react'
+import { ListOrdered, Plus, Send, Trash2, Save, X } from 'lucide-react'
 
 export default function ListsPage() {
   const router = useRouter()
@@ -44,7 +44,7 @@ export default function ListsPage() {
               Saved lists
             </span>
             <h1 className="text-display text-3xl md:text-4xl mb-2">Your shopping lists</h1>
-            <p className="text-slate-400">Save the things you reorder regularly. Tap once to send the whole list.</p>
+            <p className="text-slate-400">Saved in this browser. Use a list to prepare a new request for review.</p>
           </div>
           <button onClick={() => setCreating(true)} className="btn-primary text-sm flex-shrink-0">
             <Plus className="w-4 h-4" />
@@ -128,7 +128,7 @@ export default function ListsPage() {
               disabled={!draftName.trim() || draftItems.length === 0}
               className="btn-primary w-full"
             >
-              <Sparkles className="w-4 h-4" />
+              <Save className="w-4 h-4" />
               Save list
             </button>
           </div>
@@ -179,7 +179,7 @@ export default function ListsPage() {
 
                 <button onClick={() => handleDispatch(list)} className="btn-primary w-full text-sm">
                   <Send className="w-4 h-4" />
-                  Order whole list
+                  Review this list
                 </button>
               </article>
             ))}

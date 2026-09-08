@@ -25,7 +25,7 @@ export default function TodayPanel() {
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-1">Spent</p>
-          <p className="text-2xl font-display font-extrabold gradient-text-warm">₹{total}</p>
+          <p className="text-2xl font-display font-extrabold text-emerald-800">₹{total}</p>
         </div>
       </div>
     </div>

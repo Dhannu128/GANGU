@@ -1,7 +1,7 @@
 'use client'
 
 import { useGANGUStore } from '@/lib/store'
-import { Star, Truck, ShieldCheck, Sparkles, Package } from 'lucide-react'
+import { Star, Truck, ShieldCheck, Package } from 'lucide-react'
 
 interface ProductComparisonProps {
   onSelectProduct: (productIndex: number) => void
@@ -20,20 +20,19 @@ export default function ProductComparison({ onSelectProduct }: ProductComparison
     <section className="mt-10 animate-rise">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-7">
         <div>
-          <span className="pill-amber mb-3">
-            <Sparkles className="w-3 h-3" />
-            Best matches
-          </span>
+          <span className="eyebrow">Options to review</span>
           <h2 className="text-display text-3xl md:text-4xl mt-2">
-            We found <span className="gradient-text-warm">{comparison.products.length} options</span>
+            {comparison.products.length} grocery options
           </h2>
-          <p className="text-slate-400 mt-2">Tap any card to order. Our pick is highlighted.</p>
+          <p className="text-slate-400 mt-2">Choose an option to review it. Nothing is ordered at this step.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {comparison.products.map((product, index) => {
           const isRecommended = index === recommendedIndex
+          const isLive = product.source === 'live_zepto_mcp'
+          const sourceLabel = isLive ? 'Verified live' : product.source === 'catalog_estimate' ? 'Estimated data' : 'Demo data'
           return (
             <article
               key={index}
@@ -52,9 +51,8 @@ export default function ProductComparison({ onSelectProduct }: ProductComparison
               {/* Recommended badge */}
               {isRecommended && (
                 <div className="absolute -top-3 left-5 z-10">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-ink-950 bg-gradient-to-r from-amber-300 to-orange-400 shadow-glow-sm">
-                    <Sparkles className="w-3 h-3" strokeWidth={3} />
-                    AI Recommended
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-emerald-900 bg-emerald-100 border border-emerald-200">
+                    Suggested option
                   </span>
                 </div>
               )}
@@ -80,10 +78,11 @@ export default function ProductComparison({ onSelectProduct }: ProductComparison
                   </span>
                 )}
               </div>
+              <span className={`data-source ${isLive ? 'live' : 'estimate'}`}>{sourceLabel}</span>
 
               {/* Image */}
               {product.image && (
-                <div className="mb-5 rounded-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/5 p-4 aspect-square flex items-center justify-center overflow-hidden">
+                <div className="mb-5 rounded-xl bg-stone-50 border border-stone-200 p-4 aspect-square flex items-center justify-center overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={product.image}
@@ -104,7 +103,7 @@ export default function ProductComparison({ onSelectProduct }: ProductComparison
                 <p className="text-3xl font-display font-extrabold text-white tracking-tight">
                   ₹{product.price}
                 </p>
-                <span className="text-xs text-slate-500 font-medium">best price</span>
+                <span className="text-xs text-slate-500 font-medium">{isLive ? 'current price' : 'estimated price'}</span>
               </div>
 
               {/* Meta row */}
@@ -127,7 +126,7 @@ export default function ProductComparison({ onSelectProduct }: ProductComparison
               {isRecommended && recommendation?.reasoning && (
                 <div className="mt-4 pt-4 border-t border-white/5">
                   <p className="text-xs text-slate-300 leading-relaxed italic">
-                    <span className="text-amber-300 font-bold not-italic">Why this:</span>{' '}
+                    <span className="text-amber-300 font-bold not-italic">Why suggested:</span>{' '}
                     {recommendation.reasoning}
                   </p>
                 </div>
@@ -141,7 +140,7 @@ export default function ProductComparison({ onSelectProduct }: ProductComparison
                 }}
                 className={`mt-4 w-full ${isRecommended ? 'btn-primary' : 'btn-secondary'} text-sm`}
               >
-                {isRecommended ? 'Order this →' : 'Choose this'}
+                Review this option
               </button>
             </article>
           )

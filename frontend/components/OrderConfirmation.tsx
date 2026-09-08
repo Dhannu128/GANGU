@@ -2,7 +2,7 @@
 
 import { useGANGUStore } from '@/lib/store'
 import { useState } from 'react'
-import { Check, X, Edit3, ShieldCheck, Truck, Sparkles, Loader } from 'lucide-react'
+import { Check, X, Edit3, ShieldCheck, Truck, Loader } from 'lucide-react'
 
 interface OrderConfirmationProps {
   selectedProductIndex: number
@@ -32,8 +32,7 @@ export default function OrderConfirmation({ selectedProductIndex, onConfirm, onC
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md"
-      style={{ background: 'radial-gradient(ellipse at center, rgba(7, 9, 15, 0.85), rgba(7, 9, 15, 0.95))' }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#21342b]/70"
       onClick={onCancel}
     >
       <div
@@ -52,11 +51,8 @@ export default function OrderConfirmation({ selectedProductIndex, onConfirm, onC
 
         {/* Header */}
         <div className="mb-6">
-          <span className="pill-amber mb-3">
-            <Sparkles className="w-3 h-3" />
-            Confirm your order
-          </span>
-          <h3 className="text-2xl md:text-3xl text-display mt-1">Ready to place this?</h3>
+          <span className="eyebrow">Final review</span>
+          <h3 className="text-2xl md:text-3xl text-display mt-2">Check every detail</h3>
         </div>
 
         {/* Product summary */}
@@ -78,7 +74,7 @@ export default function OrderConfirmation({ selectedProductIndex, onConfirm, onC
               <p className="font-semibold text-white text-base leading-snug line-clamp-2 mb-2">
                 {selectedProduct.name}
               </p>
-              <p className="text-3xl font-display font-extrabold gradient-text-warm">₹{selectedProduct.price}</p>
+              <p className="text-3xl font-display font-extrabold text-emerald-800">₹{selectedProduct.price}</p>
             </div>
           </div>
 
@@ -106,7 +102,7 @@ export default function OrderConfirmation({ selectedProductIndex, onConfirm, onC
         {recommendation?.reasoning && (
           <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-4 mb-6">
             <p className="text-[10px] uppercase tracking-widest font-bold text-amber-300 mb-2 inline-flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> Why GANGU picked this
+              Why this option was suggested
             </p>
             <p className="text-sm text-slate-200 leading-relaxed">{recommendation.reasoning}</p>
           </div>
@@ -128,7 +124,7 @@ export default function OrderConfirmation({ selectedProductIndex, onConfirm, onC
             {loading ? (
               <>
                 <Loader className="w-4 h-4 animate-spin" />
-                Placing order…
+                Confirming…
               </>
             ) : (
               <>

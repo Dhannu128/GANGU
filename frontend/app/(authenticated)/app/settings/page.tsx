@@ -36,7 +36,7 @@ export default function SettingsPage() {
     pushToast({
       variant: 'success',
       title: 'Settings saved',
-      description: 'Your preferences are updated everywhere.',
+      description: 'Your preferences were saved in this browser.',
     })
   }
 
@@ -55,7 +55,7 @@ export default function SettingsPage() {
             Preferences
           </span>
           <h1 className="text-display text-3xl md:text-4xl mb-2">Settings</h1>
-          <p className="text-slate-400">Make GANGU feel like yours.</p>
+          <p className="text-slate-400">Adjust this browser for the way you use GANGU.</p>
         </header>
 
         <div className="space-y-5">
@@ -78,16 +78,17 @@ export default function SettingsPage() {
             </div>
           </Section>
 
-          <Section icon={MapPin} title="Default delivery address" subtitle="Where your orders should arrive.">
+          <Section icon={MapPin} title="Default delivery address" subtitle="Required before you confirm an option.">
             <input
               type="text"
               value={draft.address}
               onChange={(e) => patch({ address: e.target.value })}
+              placeholder="House, street, city and postcode"
               className="input-base"
             />
           </Section>
 
-          <Section icon={Wallet} title="Payment method" subtitle="Default for confirmed orders.">
+          <Section icon={Wallet} title="Payment preference" subtitle="Saved as a preference; the provider checkout controls available payment methods.">
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
@@ -134,12 +135,11 @@ export default function SettingsPage() {
             </div>
           </Section>
 
-          <Section icon={ShieldCheck} title="Data & privacy" subtitle="Your voice is transcribed once and discarded — never stored.">
-            <div className="flex flex-wrap gap-2">
-              <button className="btn-secondary text-sm">Download my data</button>
-              <button className="btn-secondary text-sm">Delete order history</button>
-              <button className="btn-danger text-sm">Delete my account</button>
-            </div>
+          <Section icon={ShieldCheck} title="Data & privacy" subtitle="Lists, contacts, order summaries and preferences on these screens are currently stored in this browser.">
+            <p className="text-sm text-slate-500 leading-relaxed">
+              Account export and account deletion are not available in this version. Contact support
+              before using GANGU with personal or payment-sensitive information.
+            </p>
           </Section>
 
           {user && (
@@ -176,7 +176,7 @@ export default function SettingsPage() {
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white">Unsaved changes</p>
-              <p className="text-xs text-slate-400 truncate">Tap save to apply across your account.</p>
+              <p className="text-xs text-slate-400 truncate">Tap save to keep them in this browser.</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

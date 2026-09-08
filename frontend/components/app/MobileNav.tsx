@@ -16,7 +16,7 @@ export default function MobileNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-white/10 bg-ink-950/95 backdrop-blur-xl">
+    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-[#d4dee8] bg-white">
       <div className="grid grid-cols-5">
         {NAV.map((item) => {
           const isActive = item.href === '/app' ? pathname === '/app' : pathname.startsWith(item.href)
@@ -28,12 +28,12 @@ export default function MobileNav() {
               className="flex flex-col items-center gap-1 py-2.5 transition-colors"
             >
               <Icon
-                className={`w-5 h-5 ${isActive ? 'text-amber-300' : 'text-slate-500'}`}
+                className={`w-5 h-5 ${isActive ? 'text-[#0f766e]' : 'text-[#6a7a8c]'}`}
                 strokeWidth={isActive ? 2.5 : 2}
               />
               <span
                 className={`text-[10px] font-semibold ${
-                  isActive ? 'text-amber-200' : 'text-slate-500'
+                  isActive ? 'text-[#0a4f4a]' : 'text-[#6a7a8c]'
                 }`}
               >
                 {item.label}
