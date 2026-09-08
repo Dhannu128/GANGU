@@ -665,7 +665,28 @@ html.gangu-high-contrast body {
   .marketing-footer { grid-template-columns: 1fr; }
   .marketing-footer .brand-lockup { grid-row: auto; }
   .auth-intro { display: none; }
-  .auth-layout { min-height: auto; padding-top: 2rem; }
+  .auth-layout { width: min(100% - 1.5rem, 540px); min-height: auto; padding: 1.5rem 0 2.5rem; }
+  .auth-card { border-radius: 16px; }
+}
+
+@media (max-width: 480px) {
+  html { -webkit-text-size-adjust: 100%; }
+  .auth-page { padding-bottom: 1rem; }
+  .auth-header { width: calc(100% - 1.5rem); min-height: 64px; }
+  .auth-header .brand-lockup { gap: .5rem; font-size: .95rem; }
+  .auth-header .brand-lockup svg { width: 32px; height: 32px; }
+  .auth-header .quiet-link { font-size: .78rem; }
+  .auth-layout { width: calc(100% - 1rem); padding: 1rem 0 1.5rem; }
+  .auth-card { padding: 1.25rem; border-radius: 14px; }
+  .auth-card-heading { margin-bottom: 1.2rem; }
+  .auth-card-heading h2 { font-size: 1.45rem; }
+  .primary-action, .secondary-action, .google-button { min-height: 50px; padding-inline: 1rem; }
+  .phone-field { min-height: 52px; }
+  .phone-field span { padding-inline: .7rem; }
+  .otp-field { min-height: 58px; font-size: 1.35rem; letter-spacing: .3em; }
+  .code-actions { align-items: flex-start; gap: .75rem; flex-direction: column; }
+  .status-notice { align-items: flex-start; }
+  .status-notice button { min-height: 32px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

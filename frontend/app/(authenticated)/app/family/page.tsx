@@ -43,7 +43,7 @@ export default function FamilyPage() {
   return (
     <main className="min-h-screen pb-12">
       <div className="max-w-4xl mx-auto px-5 md:px-8 pt-8 md:pt-10">
-        <header className="mb-8 flex items-end justify-between gap-4">
+        <header className="mb-8 flex flex-col items-stretch gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <span className="pill-cyan mb-3 inline-flex">
               <Heart className="w-3 h-3" />
@@ -55,7 +55,7 @@ export default function FamilyPage() {
               only in this browser; GANGU does not send an invitation or grant account access yet.
             </p>
           </div>
-          <button onClick={() => setInviting(true)} className="btn-primary text-sm flex-shrink-0">
+          <button onClick={() => setInviting(true)} className="btn-primary w-full text-sm sm:w-auto sm:flex-shrink-0">
             <UserPlus className="w-4 h-4" />
             Add contact
           </button>

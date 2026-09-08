@@ -205,7 +205,7 @@ export default function AppHome() {
         )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* CENTER */}
-          <div className="lg:col-span-2 order-2 lg:order-1">
+          <div className="lg:col-span-2 order-1">
             <Greeting onReorder={pastOrders[0] ? handleReorderLast : undefined} />
 
             <div className="surface-card p-6 md:p-9">
@@ -237,7 +237,7 @@ export default function AppHome() {
           </div>
 
           {/* RIGHT */}
-          <div className="lg:col-span-1 order-1 lg:order-2">
+          <div className="lg:col-span-1 order-2">
             <div className="lg:sticky lg:top-5 space-y-0">
               <TodayPanel />
               <AgentTimeline />

@@ -37,7 +37,7 @@ export default function ListsPage() {
   return (
     <main className="min-h-screen pb-12">
       <div className="max-w-5xl mx-auto px-5 md:px-8 pt-8 md:pt-10">
-        <header className="mb-8 flex items-end justify-between gap-4">
+        <header className="mb-8 flex flex-col items-stretch gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <span className="pill-violet mb-3 inline-flex">
               <ListOrdered className="w-3 h-3" />
@@ -46,7 +46,7 @@ export default function ListsPage() {
             <h1 className="text-display text-3xl md:text-4xl mb-2">Your shopping lists</h1>
             <p className="text-slate-400">Saved in this browser. Use a list to prepare a new request for review.</p>
           </div>
-          <button onClick={() => setCreating(true)} className="btn-primary text-sm flex-shrink-0">
+          <button onClick={() => setCreating(true)} className="btn-primary w-full text-sm sm:w-auto sm:flex-shrink-0">
             <Plus className="w-4 h-4" />
             New list
           </button>
@@ -76,7 +76,7 @@ export default function ListsPage() {
               className="input-base mb-3"
             />
 
-            <div className="flex gap-2 mb-3">
+            <div className="flex flex-col gap-2 mb-3 sm:flex-row">
               <input
                 type="text"
                 value={draftItem}
@@ -97,7 +97,7 @@ export default function ListsPage() {
                     setDraftItem('')
                   }
                 }}
-                className="btn-secondary"
+                className="btn-secondary w-full sm:w-auto"
               >
                 <Plus className="w-4 h-4" />
                 Add

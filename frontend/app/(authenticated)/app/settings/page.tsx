@@ -165,11 +165,11 @@ export default function SettingsPage() {
 
       {/* Sticky save bar */}
       <div
-        className={`fixed bottom-4 inset-x-0 z-40 px-4 transition-all duration-300 ${
+        className={`fixed bottom-20 lg:bottom-4 inset-x-0 z-40 px-4 transition-all duration-300 ${
           isDirty ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'
         }`}
       >
-        <div className="max-w-3xl mx-auto glass-strong rounded-2xl shadow-card border border-amber-500/30 px-5 py-3.5 flex items-center justify-between gap-4 animate-rise">
+        <div className="max-w-3xl mx-auto glass-strong rounded-2xl shadow-card border border-amber-500/30 px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 animate-rise">
           <div className="flex items-center gap-3 min-w-0">
             <span className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
               <Check className="w-4 h-4 text-amber-300" />
@@ -179,12 +179,12 @@ export default function SettingsPage() {
               <p className="text-xs text-slate-400 truncate">Tap save to keep them in this browser.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={handleDiscard} className="btn-secondary text-sm">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-shrink-0">
+            <button onClick={handleDiscard} className="btn-secondary text-sm px-3 sm:px-5">
               <RotateCcw className="w-4 h-4" />
               Discard
             </button>
-            <button onClick={handleSave} className="btn-primary text-sm">
+            <button onClick={handleSave} className="btn-primary text-sm px-3 sm:px-5">
               <Save className="w-4 h-4" />
               Save changes
             </button>
