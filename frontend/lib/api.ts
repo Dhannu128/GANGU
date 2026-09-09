@@ -3,7 +3,12 @@ import { signOut as firebaseSignOut } from 'firebase/auth'
 import { auth } from './firebase'
 import { useGANGUStore } from './store'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// Vercel builds do not inherit local .env files. Keep local development pointed at
+// FastAPI, but use the deployed API when no production environment override exists.
+const DEFAULT_API_URL = process.env.NODE_ENV === 'production'
+  ? 'https://gangu-api.onrender.com'
+  : 'http://localhost:8000'
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/$/, '')
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || API_BASE_URL.replace(/^http/, 'ws').replace(/\/$/, '')
 
 export const requestErrorMessage = (error: unknown): string => {
