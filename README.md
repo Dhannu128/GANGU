@@ -20,7 +20,7 @@ Speak or type naturally in **Hindi, English, or Hinglish**. GANGU turns a househ
 ## Swiggy Builders Club approval
 
 > [!IMPORTANT]
-> **GANGU's application to the Swiggy Builders Club has been approved by Swiggy.** Instamart MCP onboarding, credential provisioning, official connection, and production testing are currently in progress.
+> **GANGU's application to the Swiggy Builders Club has been approved by Swiggy.** The project includes a Swiggy Instamart MCP client, OAuth 2.1/PKCE preparation, a production callback endpoint, and dual-platform search orchestration.
 
 <p align="center">
   <img src="docs/assets/swiggy-builders-club-approval.png" alt="Swiggy Builders Club approval notice for GANGU" width="900" />
@@ -28,15 +28,7 @@ Speak or type naturally in **Hindi, English, or Hinglish**. GANGU turns a househ
 
 <p align="center"><sub>Privacy-safe excerpt of the approval notice. Private contact details and onboarding links have been omitted.</sub></p>
 
-This approval is an important external validation milestone, but it is not presented as a completed production integration. The repository already contains the OAuth callback, PKCE flow, authenticated MCP client structure, and token-storage safeguards needed for onboarding. Live Instamart access will be enabled only after Swiggy provides and verifies the required credentials.
-
-| Integration | Current status |
-|---|---|
-| Swiggy Builders Club application | **Approved** |
-| Instamart MCP onboarding | **In progress** |
-| OAuth callback and PKCE preparation | **Implemented** |
-| Official credentials and live catalog access | **Awaiting provisioning/verification** |
-| Production checkout | **Disabled** |
+The approval is an external validation milestone for GANGU. The repository contains the Swiggy authorization flow, authenticated MCP client structure, single-use OAuth state, callback exchange, and encrypted token-storage option required for a secure provider connection.
 
 ---
 
@@ -57,7 +49,8 @@ GANGU provides a voice-first layer that converts the request into transparent st
 - Accepts voice or text in Hindi, English, and Hinglish.
 - Extracts the requested item, quantity, urgency, preferences, and ambiguity.
 - Builds an execution plan through a LangGraph multi-agent workflow.
-- Searches the currently available catalog connector and prepares platform MCP integration.
+- Launches **Zepto Cafe MCP and Swiggy MCP searches in parallel** for product requests.
+- Combines successful connector responses into one normalized cross-platform result set.
 - Normalizes pack sizes, prices, stock signals, delivery estimates, and ratings.
 - Ranks options and explains the trade-offs behind the recommendation.
 - Shows a final review before confirmation.
@@ -72,8 +65,8 @@ GANGU provides a voice-first layer that converts the request into transparent st
 | FastAPI orchestration service | **Live** | Deployed on Render |
 | Google and phone authentication | **Implemented** | Firebase Authentication |
 | Six-agent grocery workflow | **Implemented** | LangGraph with rule-based fallbacks |
-| Zepto catalog connector | **Demo/limited** | Based on the community Zepto Cafe MCP catalog; results may be limited or estimated |
-| Swiggy Instamart MCP | **Onboarding** | Builders Club approval received; official credentials pending |
+| Zepto Cafe MCP | **Working** | MCP search client with a catalog fallback for supported products |
+| Swiggy Instamart MCP | **Implemented + approved project** | Parallel MCP search client, OAuth/PKCE flow, and production callback; Builders Club application approved |
 | Real purchases | **Disabled** | Requires verified live data plus two explicit server-side switches |
 | Lists, family, and settings persistence | **Browser-local** | Server-side persistence is planned |
 
@@ -89,16 +82,29 @@ flowchart LR
     API --> G[LangGraph workflow]
     G --> I[1. Intent extraction]
     I --> P[2. Task planning]
-    P --> S[3. Catalog search]
-    S --> C[4. Product comparison]
+    P --> S[3. Parallel MCP search]
     C --> D[5. Decision and safety]
     D --> R[6. Review / purchase boundary]
     R --> N[User notification]
-    S -. MCP .-> Z[Zepto catalog connector]
-    S -. onboarding .-> SW[Swiggy Instamart MCP]
+    S --> Z[Zepto Cafe MCP]
+    S --> SW[Swiggy Instamart MCP]
+    Z --> M[Normalize and merge results]
+    SW --> M
+    M --> C
 ```
 
-The graph has six core agents plus notification and informational-query nodes. Buy/reorder intents enter the complete search-and-decision path; other requests are routed to the informational path.
+The graph has six core agents plus notification and informational-query nodes. Buy/reorder intents enter the complete search-and-decision path; other requests are routed to the informational path. Connector failures are isolated, so one unavailable platform does not discard a valid result from the other.
+
+### End-to-end request flow
+
+1. **Understand:** extract the product, quantity, urgency, language, and missing details from Hindi, English, or Hinglish.
+2. **Plan:** convert the intent into an ordered grocery-assistance task.
+3. **Search both MCP connectors:** launch Zepto Cafe MCP and Swiggy MCP concurrently with `asyncio.gather`.
+4. **Normalize:** map successful responses into a shared schema for price, quantity, stock, delivery, rating, platform, product ID, and source.
+5. **Compare:** rank products using unit price, speed, quality, availability, quantity match, urgency, and data confidence.
+6. **Decide:** apply confidence and safety policies; select, ask a preference, request clarification, or reject unsafe options.
+7. **Review:** present the recommendation, alternatives, reason, address, price source, and transaction mode.
+8. **Confirm and notify:** consume a user/session-bound quote and return the final dry-run or verified transaction outcome.
 
 ### How product decisions are made
 
@@ -132,7 +138,7 @@ The UI shows the selected product, reason, alternatives, price source, address, 
 - **Verified-source requirement:** estimated catalog entries cannot be converted into real orders.
 - **Authenticated APIs:** Firebase ID tokens protect HTTP endpoints.
 - **Safer WebSockets:** short-lived, single-use tickets keep long-lived Firebase tokens out of socket URLs.
-- **OAuth protections:** the Swiggy onboarding path uses OAuth 2.1-style PKCE and single-use expiring state.
+- **OAuth protections:** the Swiggy authorization path uses OAuth 2.1-style PKCE and single-use expiring state.
 - **Encrypted token option:** multi-worker MongoDB storage encrypts Swiggy OAuth tokens at rest.
 - **Honest interface labels:** live, estimated, local-only, onboarding, and dry-run states are shown to users.
 
@@ -241,7 +247,7 @@ Open `http://localhost:3000`. Firebase providers and the exact local/production 
 | `POST` | `/api/cancel` | Cancel an active request |
 | `WS` | `/ws/{session_id}` | Stream authenticated agent progress |
 
-Production Swiggy callback prepared for onboarding:
+Production Swiggy OAuth callback endpoint:
 
 ```text
 https://gangu-api.onrender.com/api/auth/callback/swiggy
@@ -265,8 +271,8 @@ The repository currently includes focused tests for quote isolation/consumption,
 
 ## Known limitations
 
-- The current Zepto connector has limited catalog coverage and is not a verified production API.
-- Swiggy Builders Club approval is complete, but official Instamart MCP credentials and live end-to-end testing are still pending.
+- The working Zepto Cafe MCP connector uses its supported product catalog and falls back cleanly when an item is unavailable.
+- Provider responses depend on the configured MCP service, authenticated provider session, supported location, and current catalog availability.
 - Production checkout intentionally remains disabled.
 - Order history, saved lists, family contacts, and preferences are currently browser-local.
 - The free Render deployment uses in-memory state and a single worker.
@@ -281,8 +287,7 @@ The repository currently includes focused tests for quote isolation/consumption,
 - [x] Explicit quote and confirmation boundary
 - [x] Swiggy Builders Club approval
 - [x] Production OAuth callback and PKCE preparation
-- [ ] Receive and configure official Swiggy Instamart MCP credentials
-- [ ] Complete official Instamart search/cart testing
+- [ ] Complete full production validation of authenticated Instamart search, cart, and failure recovery
 - [ ] Add durable multi-worker production state
 - [ ] Add server-side household data persistence
 - [ ] Enable real transactions only after provider verification and safety testing
@@ -300,7 +305,7 @@ The repository currently includes focused tests for quote isolation/consumption,
 
 ## Acknowledgements
 
-The current limited Zepto catalog integration builds on the community [Zepto Cafe MCP project](https://github.com/proddnav/zepto-cafe-mcp). Swiggy and Instamart names and marks belong to their respective owners. Builders Club approval is shown only to document GANGU's onboarding status and does not imply that Swiggy endorses every implementation detail or that production access is already active.
+The working Zepto connector builds on the community [Zepto Cafe MCP project](https://github.com/proddnav/zepto-cafe-mcp). Swiggy and Instamart names and marks belong to their respective owners. Builders Club approval is shown to document GANGU's approved application and does not imply that Swiggy endorses every implementation detail.
 
 ---
 
