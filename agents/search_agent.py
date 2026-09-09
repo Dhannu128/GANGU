@@ -946,12 +946,15 @@ async def search_zepto_mcp(item_name: str) -> dict:
     script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     server_path = os.path.join(script_dir, "zepto-cafe-mcp", "zepto_mcp_server.py")
 
+    mcp_connected = False
+
     # If server file exists, use the full MCP client
     if os.path.exists(server_path):
         client = ZeptoMCPClient(server_path)
         try:
             await client.connect()
             result = await client.search_product(item_name)
+            mcp_connected = bool(result and result.get("found"))
         except Exception as e:
             # Fall through to catalog search below
             print(f"Zepto MCP server failed, using catalog: {e}")
@@ -1025,7 +1028,9 @@ async def search_zepto_mcp(item_name: str) -> dict:
             "reviews_count": 500,
             "product_id": result.get("product_id", "zepto_" + product_name.replace(" ", "_").lower()),
             "elderly_friendly": True,
-            "source": "catalog_estimate",
+            "source": "live_zepto_mcp" if mcp_connected else "catalog_estimate",
+            "price_verified": False,
+            "checkout_supported": mcp_connected,
             "brand": "Zepto",
             "currency": "INR"
         }

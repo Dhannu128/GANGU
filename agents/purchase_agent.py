@@ -57,8 +57,12 @@ PRICE_SPIKE_THRESHOLD = 1.5  # 50% increase = suspicious
 MAX_RETRY_ATTEMPTS = 3
 RETRY_DELAY_SECONDS = 2
 
-# Dry run mode (for testing)
-DRY_RUN_MODE = os.environ.get('GANGU_DRY_RUN', 'true').lower() == 'true'
+def is_dry_run_mode() -> bool:
+    """Read the purchase policy at execution time, not only at import time."""
+    return os.environ.get('GANGU_DRY_RUN', 'true').strip().lower() == 'true'
+
+
+DRY_RUN_MODE = is_dry_run_mode()
 
 # Order history for idempotency (in-memory for now)
 order_history = {}
@@ -884,7 +888,7 @@ def execute_purchase_with_retry(
         
         try:
             # Execute based on platform
-            if platform.lower() == "zepto" and not DRY_RUN_MODE and cash_on_delivery:
+            if platform.lower() == "zepto" and not is_dry_run_mode() and cash_on_delivery:
                 # Real Zepto execution using MCP client
                 print(f"   🛒 Executing Zepto Cash on Delivery order...")
                 
@@ -905,7 +909,12 @@ def execute_purchase_with_retry(
                             normalized_product_name = normalize_product_name(original_product_name)
                             print(f"   📦 Starting Zepto order for: {original_product_name} → {normalized_product_name}")
                             
-                            order_result = await zepto_client.start_zepto_order(normalized_product_name)
+                            order_result = await zepto_client.start_zepto_order(
+                                normalized_product_name,
+                                item_url=product.get('url'),
+                                phone_number=os.getenv('ZEPTO_PHONE_NUMBER'),
+                                address=delivery.get('address') or os.getenv('ZEPTO_DEFAULT_ADDRESS'),
+                            )
                             print(f"   ✅ Zepto order result: {order_result}")
                             
                             await zepto_client.disconnect()
@@ -927,7 +936,7 @@ def execute_purchase_with_retry(
                         order_success = True
                     
                     # Process the result - check for successful order placement
-                    if order_success and ("order placed" in order_message or "successfully" in order_message):
+                    if order_success and order_result.get("status") == "completed":
                         order_id = f"ZEPTO_COD_{int(time.time())}"
                         transaction_id = f"COD_TXN_{int(time.time())}"
                         
@@ -958,66 +967,13 @@ def execute_purchase_with_retry(
                         return result
                     
                     elif "out of stock" in order_message:
-                        # Product is out of stock - try similar alternatives
-                        original_product = product.get('name', 'unknown')
-                        similar_products = get_similar_products(original_product)
-                        
-                        print(f"   ⚠️ '{original_product}' is out of stock")
-                        print(f"   🔄 Trying similar products: {similar_products}")
-                        
-                        for similar_product in similar_products:
-                            print(f"   📦 Attempting alternative: {similar_product}")
-                            
-                            # Try ordering the similar product
-                            async def try_similar_order():
-                                server_script_path = gangu_root / "zepto-cafe-mcp" / "zepto_mcp_server.py"
-                                zepto_client = ZeptoMCPClient(str(server_script_path))
-                                try:
-                                    await zepto_client.connect()
-                                    similar_result = await zepto_client.start_zepto_order(similar_product)
-                                    await zepto_client.disconnect()
-                                    return similar_result
-                                except Exception as e:
-                                    await zepto_client.disconnect()
-                                    raise e
-                            
-                            try:
-                                similar_result = asyncio.run(try_similar_order())
-                                
-                                if isinstance(similar_result, dict):
-                                    similar_message = similar_result.get('message', '').lower()
-                                    similar_success = similar_result.get('success', False)
-                                    
-                                    if similar_success and "out of stock" not in similar_message and "not found" not in similar_message:
-                                        # Success with similar product!
-                                        order_id = f"ZEPTO_COD_{int(time.time())}"
-                                        transaction_id = f"COD_TXN_{int(time.time())}"
-                                        
-                                        result["status"] = "success"
-                                        result["order_id"] = order_id
-                                        result["transaction_id"] = transaction_id
-                                        result["payment_method"] = "cash_on_delivery"
-                                        result["original_product"] = original_product
-                                        result["substituted_product"] = similar_product
-                                        
-                                        print(f"   ✅ Alternative order successful!")
-                                        print(f"   📦 Ordered: {similar_product} (substitute for {original_product})")
-                                        print(f"   🆔 Order ID: {order_id}")
-                                        return result
-                                    elif "out of stock" in similar_message:
-                                        print(f"   ❌ '{similar_product}' also out of stock")
-                                        continue
-                                    else:
-                                        print(f"   ❌ '{similar_product}' failed: {similar_message[:50]}...")
-                                        continue
-                                        
-                            except Exception as e:
-                                print(f"   ❌ Error trying '{similar_product}': {str(e)[:50]}...")
-                                continue
-                        
-                        # All similar products failed
-                        raise Exception(f"'{original_product}' and all alternatives out of stock")
-                    
+                        # The user confirmed this exact product. Do not place an
+                        # alternative without issuing a new quote and confirmation.
+                        raise Exception(
+                            f"'{product.get('name', 'product')}' is out of stock; "
+                            "choose and confirm an alternative"
+                        )
+
                     elif "not found in catalog" in order_message:
                         # Product not found - try with normalized name
                         original_product = product.get('name', 'unknown')
@@ -1032,7 +988,12 @@ def execute_purchase_with_retry(
                                 zepto_client = ZeptoMCPClient(str(server_script_path))
                                 try:
                                     await zepto_client.connect()
-                                    retry_result = await zepto_client.start_zepto_order(normalized_product)
+                                    retry_result = await zepto_client.start_zepto_order(
+                                        normalized_product,
+                                        item_url=product.get('url'),
+                                        phone_number=os.getenv('ZEPTO_PHONE_NUMBER'),
+                                        address=delivery.get('address') or os.getenv('ZEPTO_DEFAULT_ADDRESS'),
+                                    )
                                     await zepto_client.disconnect()
                                     return retry_result
                                 except Exception as e:
@@ -1045,7 +1006,7 @@ def execute_purchase_with_retry(
                                 retry_message = retry_result.get('message', '').lower()
                                 retry_success = retry_result.get('success', False)
                                 
-                                if retry_success and ("order placed" in retry_message or "successfully" in retry_message):
+                                if retry_success and retry_result.get("status") == "completed":
                                     order_id = f"ZEPTO_COD_{int(time.time())}"
                                     transaction_id = f"COD_TXN_{int(time.time())}"
                                     
@@ -1069,7 +1030,7 @@ def execute_purchase_with_retry(
                 else:
                     raise Exception("Zepto MCP client not available")
             
-            elif DRY_RUN_MODE:
+            elif is_dry_run_mode():
                 # Dry run mode
                 print(f"   [DRY RUN] Would add {product['name']} to cart on {platform}")
                 print(f"   [DRY RUN] Would proceed with {'Cash on Delivery' if cash_on_delivery else 'default payment'}")
@@ -1250,7 +1211,8 @@ def execute_purchase(decision_input: Dict[str, Any]) -> Dict[str, Any]:
     if cash_on_delivery:
         print(f"   💳 Payment Method: Cash on Delivery (COD)")
     
-    if DRY_RUN_MODE:
+    dry_run_mode = is_dry_run_mode()
+    if dry_run_mode:
         print(f"   🧪 DRY RUN MODE - Simulating purchase")
     
     execution_result = execute_purchase_with_retry(
@@ -1316,7 +1278,7 @@ def execute_purchase(decision_input: Dict[str, Any]) -> Dict[str, Any]:
             "fallback_used": False,
             "user_message": f"✅ Order placed successfully! {product_name} will arrive on {delivery.get('delivery_date', 'soon')}.",
             "audit_log_id": audit_id,
-            "dry_run": DRY_RUN_MODE
+            "dry_run": dry_run_mode
         }
     
     else:
@@ -1462,7 +1424,7 @@ if __name__ == "__main__":
 ╚══════════════════════════════════════════════════════════════╝
     """)
     
-    if DRY_RUN_MODE:
+    if is_dry_run_mode():
         print("🧪 DRY RUN MODE ENABLED - No actual purchases will be made\n")
     
     # Test example

@@ -221,6 +221,27 @@ async def root():
         "version": "1.0.0"
     }
 
+
+@app.get("/api/integrations/zepto/status")
+async def zepto_integration_status():
+    """Report capability readiness without exposing phone/address secrets."""
+    server_path = Path(__file__).parent.parent / "zepto-cafe-mcp" / "zepto_mcp_server.py"
+    phone_configured = bool(os.getenv("ZEPTO_PHONE_NUMBER", "").strip())
+    address_configured = bool(os.getenv("ZEPTO_DEFAULT_ADDRESS", "").strip())
+    dry_run = os.getenv("GANGU_DRY_RUN", "true").strip().lower() == "true"
+    enabled = os.getenv("ENABLE_REAL_PURCHASES", "false").strip().lower() == "true"
+    return {
+        "provider": "zepto",
+        "mcp_server_available": server_path.exists(),
+        "catalog_search_ready": server_path.exists(),
+        "cod_only": os.getenv("ZEPTO_PAYMENT_METHOD", "cod").strip().lower() == "cod",
+        "phone_configured": phone_configured,
+        "address_configured": address_configured,
+        "dry_run": dry_run,
+        "real_purchase_enabled": enabled,
+        "order_flow_ready": server_path.exists() and phone_configured and address_configured and enabled and not dry_run,
+    }
+
 @app.post("/api/voice/transcribe")
 async def transcribe_voice(
     request: VoiceTranscriptionRequest,
@@ -722,6 +743,8 @@ async def confirm_order(
                         "quantity": product.get("quantity", "1 unit"),
                         "price": product.get("price", 0),
                         "currency": product.get("currency", "INR"),
+                        "url": product.get("url"),
+                        "source": product.get("source"),
                     },
                     "delivery": {
                         "delivery_date": "today",

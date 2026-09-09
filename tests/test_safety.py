@@ -11,7 +11,7 @@ os.environ.setdefault("GANGU_AUTH_REQUIRED", "false")
 os.environ["GANGU_DRY_RUN"] = "true"
 os.environ["ENABLE_REAL_PURCHASES"] = "false"
 
-from api.main import OrderConfirmationRequest, confirm_order
+from api.main import OrderConfirmationRequest, confirm_order, zepto_integration_status
 from api import security
 from api.security import AuthenticatedUser
 from api import session_store as session_store_module
@@ -128,3 +128,13 @@ def test_estimated_product_cannot_become_real_order(monkeypatch: pytest.MonkeyPa
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(confirm_order(request, user))
     assert exc_info.value.status_code == 409
+
+
+def test_zepto_status_never_exposes_secret_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ZEPTO_PHONE_NUMBER", "9000000000")
+    monkeypatch.setenv("ZEPTO_DEFAULT_ADDRESS", "Private Home Address")
+    status = asyncio.run(zepto_integration_status())
+    assert status["phone_configured"] is True
+    assert status["address_configured"] is True
+    assert "9000000000" not in str(status)
+    assert "Private Home Address" not in str(status)

@@ -6,7 +6,7 @@ services:
     runtime: python
     plan: free                 # bump to "starter" ($7/mo) if you need Playwright/MCP
     region: oregon             # or singapore for India proximity
-    buildCommand: pip install -r config/requirements.txt && pip install -r api/requirements.txt
+    buildCommand: pip install -r config/requirements.txt && pip install -r api/requirements.txt && python -m playwright install firefox
     startCommand: python api/main.py
     healthCheckPath: /
     autoDeploy: true
@@ -35,6 +35,14 @@ services:
         value: "true"          # never place real Zepto orders from prod
       - key: ENABLE_REAL_PURCHASES
         value: "false"
+      - key: ZEPTO_PHONE_NUMBER
+        sync: false            # secret; set in Render, never commit a real phone number
+      - key: ZEPTO_DEFAULT_ADDRESS
+        sync: false            # exact saved Zepto address label
+      - key: ZEPTO_PAYMENT_METHOD
+        value: cod
+      - key: ZEPTO_HEADLESS
+        value: "true"
       - key: GANGU_STATE_BACKEND
         # The free service runs one worker. Enable MongoDB only after a real
         # MONGODB_URI and SWIGGY_TOKEN_ENCRYPTION_KEY are configured.

@@ -8,7 +8,48 @@ from contextlib import AsyncExitStack
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 import os
+import re
 import sys
+
+
+def _configure_utf8_console() -> None:
+    """Keep MCP diagnostics from crashing on Windows' legacy console encoding."""
+    if sys.platform != "win32":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, ValueError):
+                pass
+
+
+_configure_utf8_console()
+
+
+def classify_order_message(message: str) -> dict:
+    """Convert the text-only upstream MCP response into a safe state.
+
+    A tool call completing is not the same as an order completing. In
+    particular, OTP prompts and an already-running workflow must never be
+    reported as successful purchases.
+    """
+    normalized = (message or "").strip().lower()
+    if not normalized:
+        return {"success": False, "status": "failed", "error": "Empty MCP response"}
+    if "waiting for login otp" in normalized or "provide the login otp" in normalized:
+        return {"success": False, "status": "login_otp_required", "requires_otp": True}
+    if "waiting for payment otp" in normalized or "provide the payment otp" in normalized:
+        return {"success": False, "status": "payment_otp_required", "requires_otp": True}
+    if "order already in progress" in normalized:
+        return {"success": False, "status": "in_progress"}
+    if normalized.startswith("error:") or normalized.startswith("failed") or "could not" in normalized:
+        return {"success": False, "status": "failed", "error": message}
+    placed = bool(re.search(r"\border (?:has been )?placed\b|\border placed\b", normalized))
+    if placed:
+        return {"success": True, "status": "completed"}
+    return {"success": False, "status": "pending"}
 
 # Product catalog from Zepto MCP Server
 ZEPTO_PRODUCT_CATALOG = {
@@ -233,7 +274,23 @@ class ZeptoMCPClient:
             "results": results
         }
 
-    async def start_zepto_order(self, product_name: str, item_url: str | None = None) -> dict:
+    async def _call_text_tool(self, name: str, arguments: dict) -> dict:
+        if not self.session:
+            await self.connect()
+        result = await self.session.call_tool(name, arguments)
+        if not result.content:
+            return {"success": False, "status": "failed", "error": "No content in response"}
+        content = result.content[0]
+        message = content.text if hasattr(content, "text") else str(content)
+        return {"message": message, "raw_result": str(result), **classify_order_message(message)}
+
+    async def start_zepto_order(
+        self,
+        product_name: str,
+        item_url: str | None = None,
+        phone_number: str | None = None,
+        address: str | None = None,
+    ) -> dict:
         """
         Start a Zepto order using the MCP server tool.
 
@@ -248,20 +305,26 @@ class ZeptoMCPClient:
             args: dict = {"product_name": product_name}
             if item_url:
                 args["item_url"] = item_url
-            result = await self.session.call_tool("start_zepto_order", args)
-            
-            # Extract the result from MCP response
-            if result.content and len(result.content) > 0:
-                content = result.content[0]
-                if hasattr(content, 'text'):
-                    return {"success": True, "message": content.text, "raw_result": str(result)}
-                else:
-                    return {"success": True, "message": str(content), "raw_result": str(result)}
-            else:
-                return {"success": False, "error": "No content in response", "raw_result": str(result)}
+            if phone_number:
+                args["phone_number"] = phone_number
+            if address:
+                args["address"] = address
+            return await self._call_text_tool("start_zepto_order", args)
                 
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "status": "failed", "error": str(e)}
+
+    async def submit_login_otp(self, otp: str) -> dict:
+        """Continue an order in the same MCP session after login OTP."""
+        return await self._call_text_tool("submit_login_otp", {"otp": otp})
+
+    async def submit_payment_otp(self, otp: str) -> dict:
+        """Continue an order in the same MCP session after payment OTP."""
+        return await self._call_text_tool("submit_payment_otp", {"otp": otp})
+
+    async def stop_order(self) -> dict:
+        """Cancel the active upstream workflow in this MCP session."""
+        return await self._call_text_tool("stop_order", {})
     
     async def get_server_status(self) -> dict:
         """Get the status of the MCP server"""
