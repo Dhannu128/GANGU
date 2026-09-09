@@ -65,10 +65,57 @@ GANGU provides a voice-first layer that converts the request into transparent st
 | FastAPI orchestration service | **Live** | Deployed on Render |
 | Google and phone authentication | **Implemented** | Firebase Authentication |
 | Six-agent grocery workflow | **Implemented** | LangGraph with rule-based fallbacks |
+| LangSmith observability | **Verified** | Captured GANGU traces show every LangGraph stage and its latency |
 | Zepto Cafe MCP | **Working** | MCP search client with a catalog fallback for supported products |
 | Swiggy Instamart MCP | **Implemented + approved project** | Parallel MCP search client, OAuth/PKCE flow, and production callback; Builders Club application approved |
 | Real purchases | **Disabled** | Requires verified live data plus two explicit server-side switches |
 | Lists, family, and settings persistence | **Browser-local** | Server-side persistence is planned |
+
+---
+
+## Product walkthrough
+
+### 1. Start with one natural request
+
+The authenticated workspace accepts speech or text and exposes the agent pipeline instead of hiding it behind a loading spinner. During a request, the user can see which checks have completed, which stage is active, overall progress, and a clear cancellation control.
+
+<p align="center">
+  <img src="docs/assets/gangu-request-progress.png" alt="GANGU voice and text ordering workspace showing live request progress" width="1000" />
+</p>
+
+### 2. Observe the complete LangGraph execution
+
+LangSmith records the real `GANGU` graph run for the Hinglish request `2 kg atta order karo`. The trace shows intent extraction, task planning, routing, search, comparison, decision, purchase boundary, and notification as separate timed steps. The captured output reaches `pending_confirmation`, demonstrating that the graph prepares a decision without silently completing a transaction.
+
+<p align="center">
+  <img src="docs/assets/langsmith-gangu-trace.png" alt="LangSmith trace of the complete GANGU LangGraph pipeline" width="1000" />
+</p>
+
+### 3. Reuse realistic household lists
+
+Saved lists reduce repeated typing for recurring needs such as monthly staples, breakfast items, and weekly basics. Selecting **Review this list** prepares the items as a new request so the user can still inspect the result before continuing.
+
+<p align="center">
+  <img src="docs/assets/gangu-saved-lists.png" alt="GANGU saved grocery lists for monthly staples, breakfast, and weekly basics" width="1000" />
+</p>
+
+### 4. Design for trusted family support
+
+The family screen records who may help an older user review or prepare an order. Support roles are explicit, and saving a contact does not silently grant account access or send an invitation. The current implementation stores these contacts only in the browser.
+
+<p align="center">
+  <img src="docs/assets/gangu-family-support.png" alt="GANGU family support screen with trusted household contacts" width="1000" />
+</p>
+
+### 5. Validate the Zepto-side connector workflow
+
+The Zepto Cafe MCP adapter is the working catalog connector used by the search agent. This Zepto account history was captured during connector-side testing and shows the provider account context used for validation. GANGU keeps provider results separate from its own confirmation boundary and labels estimated catalog data before it reaches the user.
+
+<p align="center">
+  <img src="docs/assets/zepto-mcp-order-history.png" alt="Zepto account order history used during GANGU MCP connector testing" width="1000" />
+</p>
+
+<p align="center"><sub>Only the final two digits of the displayed phone number are blurred; all other screenshot content is unchanged.</sub></p>
 
 ---
 
