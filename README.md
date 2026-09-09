@@ -44,7 +44,8 @@ This approval is an important external validation milestone, but it is not prese
 
 Many older adults know what they need but are uncomfortable navigating changing grocery-app interfaces, filters, carts, substitutions, and checkout screens. A simple request such as:
 
-> “Doodh khatam ho gaya, le aao.”  
+> “Doodh khatam ho gaya, le aao.”
+>
 > “Please bring milk; we have run out.”
 
 should not require learning another complicated interface.
