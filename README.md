@@ -167,6 +167,16 @@ def Client():
 
 GANGU uses the **Model Context Protocol (MCP)** to talk to shopping platforms:
 
+### Swiggy Builders Club milestone
+
+GANGU's application to the **Swiggy Builders Club has been approved**. This is an external validation and onboarding milestone; Instamart MCP credential provisioning, integration and production testing are still in progress.
+
+<p align="center">
+  <img src="docs/assets/swiggy-builders-club-approval.png" alt="Swiggy Builders Club approval notice for GANGU" width="900" />
+</p>
+
+<p align="center"><sub>Privacy-safe excerpt of the approval notice; private onboarding links and contact details are omitted.</sub></p>
+
 | Client | File | Transport | Status |
 |---|---|---|---|
 | **Zepto** | `mcp_clients/zepto_mcp_client.py` | `stdio` (Playwright/Firefox) | Catalog/demo connector; not a verified production API |
