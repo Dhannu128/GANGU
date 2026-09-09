@@ -27,4 +27,3 @@ def test_error_text_is_failed() -> None:
     result = classify_order_message("Error: Address is required")
     assert result["success"] is False
     assert result["status"] == "failed"
-
