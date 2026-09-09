@@ -44,6 +44,9 @@ from orchestration.gangu_graph import create_gangu_graph
 from api.security import AuthenticatedUser, authenticate_websocket, get_current_user, ws_tickets
 from api.session_store import session_store
 from api.swiggy_oauth import create_authorization_url, exchange_callback
+from api.zepto_runtime import ZeptoOrderRuntime
+
+zepto_runtime = ZeptoOrderRuntime(Path(__file__).parent.parent / "zepto-cafe-mcp" / "zepto_mcp_server.py")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,6 +58,7 @@ async def lifespan(app: FastAPI):
         print(f"❌ Failed to initialize GANGU: {e}")
         raise
     yield
+    await zepto_runtime.close_all()
 
 app = FastAPI(
     title="GANGU API",
@@ -102,6 +106,12 @@ class OrderConfirmationRequest(BaseModel):
     selected_product_index: int = Field(ge=0, le=100)
     delivery_address: str = Field(min_length=5, max_length=500)
     payment_method: Literal["upi", "cod", "card"]
+
+
+class ZeptoOtpRequest(BaseModel):
+    session_id: str = Field(min_length=8, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    otp: str = Field(pattern=r"^\d{4,8}$")
+    otp_type: Literal["login", "payment"] = "login"
 
 class CancelRequest(BaseModel):
     """Cancel processing request"""
@@ -720,6 +730,8 @@ async def confirm_order(
                 status_code=409,
                 detail="This product source does not support verified real checkout",
             )
+        elif not os.getenv("ZEPTO_PHONE_NUMBER", "").strip():
+            raise HTTPException(status_code=503, detail="Zepto phone number is not configured")
         elif not os.getenv("ZEPTO_DEFAULT_ADDRESS") or (
             os.getenv("ZEPTO_DEFAULT_ADDRESS", "").strip().casefold()
             != request.delivery_address.strip().casefold()
@@ -731,55 +743,45 @@ async def confirm_order(
         elif request.payment_method != "cod":
             raise HTTPException(status_code=409, detail="Verified Zepto checkout currently supports COD only")
         else:
-            from agents.purchase_agent import execute_purchase
-
-            decision_input = {
-                "final_decision": {
-                    "selected_platform": platform,
-                    "product": {
-                        "name": product.get("item_name") or product.get("name"),
-                        "brand": product.get("brand"),
-                        "product_id": product.get("product_id"),
-                        "quantity": product.get("quantity", "1 unit"),
-                        "price": product.get("price", 0),
-                        "currency": product.get("currency", "INR"),
-                        "url": product.get("url"),
-                        "source": product.get("source"),
-                    },
-                    "delivery": {
-                        "delivery_date": "today",
-                        "slot": "standard",
-                        "address": request.delivery_address,
-                    },
-                    "fallback_options": [],
-                },
-                "user_context": {
-                    "user_id": user.uid,
-                    "payment_preference": request.payment_method,
-                    "delivery_address": request.delivery_address,
-                },
-            }
-            purchase_result = await asyncio.to_thread(execute_purchase, decision_input)
-            if purchase_result.get("purchase_status") != "success":
+            upstream = await zepto_runtime.start(
+                user_id=user.uid,
+                session_id=session_id,
+                product_name=product.get("item_name") or product.get("name") or "product",
+                item_url=product.get("url"),
+                phone_number=os.environ["ZEPTO_PHONE_NUMBER"],
+                address=request.delivery_address,
+            )
+            if upstream.get("requires_otp"):
+                result = {
+                    "success": False,
+                    "status": upstream.get("status"),
+                    "requires_otp": True,
+                    "otp_type": "payment" if upstream.get("status") == "payment_otp_required" else "login",
+                    "message": "Enter the OTP sent by Zepto to continue this confirmed COD order.",
+                    "simulated": False,
+                    "product": product,
+                }
+            elif not upstream.get("success") or upstream.get("status") != "completed":
                 raise HTTPException(
                     status_code=502,
-                    detail=purchase_result.get("user_message", "Platform did not confirm the order"),
+                    detail=upstream.get("error") or upstream.get("message") or "Zepto did not confirm the order",
                 )
-            execution = purchase_result.get("execution_details", {})
-            result = {
-                "success": True,
-                "order_id": execution.get("order_id"),
-                "message": purchase_result.get("user_message", "Order placed successfully"),
-                "estimated_delivery": purchase_result.get("order_confirmation", {}).get("delivery_time"),
-                "simulated": False,
-                "product": product,
-            }
+            else:
+                result = {
+                    "success": True,
+                    "status": "completed",
+                    "order_id": f"ZEPTO-COD-{secrets.token_hex(6).upper()}",
+                    "message": "Zepto confirmed the Cash on Delivery order.",
+                    "estimated_delivery": product.get("delivery_time_label") or product.get("delivery_time"),
+                    "simulated": False,
+                    "product": product,
+                }
 
         await broadcast_agent_status(
             session_id,
             AgentStatusUpdate(
                 step="purchase",
-                status="complete",
+                status="processing" if result.get("requires_otp") else "complete",
                 message=result["message"],
                 data=result,
             )
@@ -790,6 +792,50 @@ async def confirm_order(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="Unable to process the confirmed quote") from e
+
+
+@app.post("/api/order/zepto/otp")
+async def submit_zepto_order_otp(
+    request: ZeptoOtpRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Continue the already-confirmed Zepto order without logging the OTP."""
+    try:
+        session_store.assert_owner(request.session_id, user.uid)
+    except PermissionError as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
+
+    try:
+        upstream = await zepto_runtime.submit_otp(
+            user.uid, request.session_id, request.otp, request.otp_type
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Zepto could not continue the OTP flow") from exc
+
+    if upstream.get("requires_otp"):
+        return {
+            "success": False,
+            "status": upstream.get("status"),
+            "requires_otp": True,
+            "otp_type": "payment" if upstream.get("status") == "payment_otp_required" else "login",
+            "message": "Enter the next OTP requested by Zepto.",
+            "simulated": False,
+        }
+    if not upstream.get("success") or upstream.get("status") != "completed":
+        raise HTTPException(
+            status_code=502,
+            detail=upstream.get("error") or upstream.get("message") or "Zepto did not confirm the order",
+        )
+    return {
+        "success": True,
+        "status": "completed",
+        "order_id": f"ZEPTO-COD-{secrets.token_hex(6).upper()}",
+        "message": "Zepto confirmed the Cash on Delivery order.",
+        "simulated": False,
+    }
+
 
 @app.get("/api/session/{session_id}")
 async def get_session_data(
@@ -847,6 +893,8 @@ async def cancel_processing(
         if task is not None and not task.done():
             task.cancel()
             print(f"⏹️ Cancelled pipeline task for session {session_id}")
+
+        await zepto_runtime.cancel(user.uid, session_id)
 
         # Broadcast cancellation immediately so the WS client updates UI
         await broadcast_agent_status(

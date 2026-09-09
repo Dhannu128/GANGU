@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useGANGUStore } from '@/lib/store'
-import { processUserInput, confirmOrder, requestErrorMessage } from '@/lib/api'
+import { processUserInput, confirmOrder, submitZeptoOrderOtp, cancelProcessing, requestErrorMessage } from '@/lib/api'
 import VoiceInput from '@/components/VoiceInput'
 import TextInput from '@/components/TextInput'
 import AgentTimeline from '@/components/AgentTimeline'
 import ProductComparison from '@/components/ProductComparison'
 import OrderConfirmation from '@/components/OrderConfirmation'
+import ZeptoOtpDialog from '@/components/ZeptoOtpDialog'
 import SuccessScreen from '@/components/SuccessScreen'
 import Greeting from '@/components/app/Greeting'
 import TodayPanel from '@/components/app/TodayPanel'
@@ -53,6 +54,7 @@ export default function AppHome() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [selectedProductIndex, setSelectedProductIndex] = useState(0)
   const [quoteId, setQuoteId] = useState<string | null>(null)
+  const [zeptoOtpType, setZeptoOtpType] = useState<'login' | 'payment' | null>(null)
   const [requestError, setRequestError] = useState('')
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
 
@@ -174,10 +176,41 @@ export default function AppHome() {
       if (result.success) {
         setOrderPlaced(true, result.order_id, result.simulated === true)
         setShowConfirmation(false)
+      } else if (result.requires_otp) {
+        setZeptoOtpType(result.otp_type === 'payment' ? 'payment' : 'login')
+        setShowConfirmation(false)
       }
     } catch (error) {
       console.error('Error confirming order:', error)
       setRequestError('We could not verify the order result. Check your provider order history before trying again.')
+    }
+  }
+
+  const handleZeptoOtp = async (otp: string) => {
+    if (!sessionId || !zeptoOtpType) return
+    try {
+      setRequestError('')
+      const result = await submitZeptoOrderOtp(sessionId, otp, zeptoOtpType)
+      if (result.success) {
+        setZeptoOtpType(null)
+        setOrderPlaced(true, result.order_id, false)
+      } else if (result.requires_otp) {
+        setZeptoOtpType(result.otp_type === 'payment' ? 'payment' : 'login')
+      }
+    } catch (error) {
+      setRequestError(requestErrorMessage(error))
+    }
+  }
+
+  const cancelZeptoOtp = async () => {
+    const currentSession = sessionId
+    setZeptoOtpType(null)
+    if (currentSession) {
+      try {
+        await cancelProcessing(currentSession)
+      } catch {
+        setRequestError('The local order screen was closed. Check Zepto before trying again.')
+      }
     }
   }
 
@@ -254,6 +287,9 @@ export default function AppHome() {
           onCancel={() => setShowConfirmation(false)}
           onChangeSelection={() => setShowConfirmation(false)}
         />
+      )}
+      {zeptoOtpType && (
+        <ZeptoOtpDialog otpType={zeptoOtpType} onSubmit={handleZeptoOtp} onCancel={cancelZeptoOtp} />
       )}
       {orderPlaced && <SuccessScreen onNewOrder={handleNewOrder} />}
     </main>

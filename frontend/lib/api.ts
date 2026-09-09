@@ -146,6 +146,16 @@ export const confirmOrder = async (
   payment_method: paymentMethod,
 })).data
 
+export const submitZeptoOrderOtp = async (
+  sessionId: string,
+  otp: string,
+  otpType: 'login' | 'payment',
+) => (await api.post('/api/order/zepto/otp', {
+  session_id: sessionId,
+  otp,
+  otp_type: otpType,
+})).data
+
 export const getSessionData = async (sessionId: string) =>
   (await api.get(`/api/session/${sessionId}`)).data
 
