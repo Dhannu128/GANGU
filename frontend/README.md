@@ -71,6 +71,6 @@ Voice input depends on the Web Speech API and microphone permission. It may be u
 
 - Firebase providers and production authorized domains must be configured and verified externally.
 - Orders, lists, contacts and preferences need authenticated server-side persistence.
-- Swiggy live access depends on approval and credentials.
+- Swiggy Builders Club approval has been received; Instamart MCP onboarding, credentials and live integration are in progress.
 - Estimated catalog results are not evidence that provider checkout is available.
 - Real purchases must remain disabled until live provider integration and end-to-end safety tests pass.

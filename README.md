@@ -20,7 +20,7 @@ GANGU is a multi-agent AI system built on **LangGraph**, powered by **Google Gem
 **The full flow:**
 1. User speaks or types in Hindi / English / Hinglish
 2. 6 AI agents work in a sequential pipeline, each with one job
-3. Products are found on **Zepto** and **Swiggy Instamart** (via MCP clients)
+3. Products are currently found through the **Zepto** catalog connector; **Swiggy Builders Club approval has been received**, with Instamart MCP onboarding and live integration in progress
 4. The best option is selected using a weighted scoring model + safety checks
 5. The user reviews the option, address, price source and transaction mode
 6. Confirmation remains a safe simulation unless every production purchase safeguard is deliberately enabled
@@ -170,7 +170,7 @@ GANGU uses the **Model Context Protocol (MCP)** to talk to shopping platforms:
 | Client | File | Transport | Status |
 |---|---|---|---|
 | **Zepto** | `mcp_clients/zepto_mcp_client.py` | `stdio` (Playwright/Firefox) | Catalog/demo connector; not a verified production API |
-| **Swiggy Instamart** | `mcp_clients/swiggy_mcp_client.py` | `SSE` over HTTP | Client scaffold; live access pending Swiggy approval |
+| **Swiggy Instamart** | `mcp_clients/swiggy_mcp_client.py` | `SSE` over HTTP | Swiggy Builders Club approval received; Instamart MCP onboarding, credential provisioning and live integration in progress |
 | Amazon | `mcp_clients/amazon_mcp_client.py` | — | Stub — not implemented |
 
 The **Zepto connector** includes a built-in product URL catalog. Prices and availability are estimates unless a verified live connector supplies them, so the API defaults to dry-run and refuses to convert estimated results into real orders.
@@ -402,7 +402,7 @@ The confirmation endpoint checks this flag before any platform call. When `true`
 
 ### ⚠️ Not Yet / Stubs
 - Durable production persistence for orders, lists, contacts, preferences and idempotency
-- Swiggy live MCP credentials and OAuth redirect flow (awaiting Swiggy approval)
+- Swiggy Instamart live MCP credential provisioning and integration completion (Builders Club approval received; onboarding in progress)
 - Zepto live MCP checkout; current catalog data is labelled as estimated
 - Backend persistence for family members + saved lists (localStorage only)
 - Amazon MCP client (`amazon_mcp_client.py` is an empty stub)

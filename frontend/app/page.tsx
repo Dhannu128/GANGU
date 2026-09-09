@@ -65,7 +65,7 @@ const FAQS = [
   ['Which languages can I use?', 'You can speak or type in Hindi, English, or natural Hinglish. Speech recognition quality still depends on your browser and microphone.'],
   ['Can I use GANGU without voice?', 'Yes. Text input is always available, including when speech recognition is unsupported or microphone permission is denied.'],
   ['How does sign-in work?', 'Google sign-in and Indian mobile OTP use Firebase Authentication. The backend validates Firebase ID tokens before allowing protected requests.'],
-  ['Is the Swiggy integration live?', 'The OAuth callback and security preparation exist, but live Swiggy functionality depends on approval and credentials. Until then, GANGU does not imply that Swiggy checkout is available.'],
+  ['Is the Swiggy integration live?', 'Swiggy Builders Club approval has been received. Instamart MCP onboarding and credential provisioning are still in progress, so GANGU does not yet imply that Swiggy checkout is live.'],
 ] as const
 
 export default function Home() {
@@ -286,7 +286,7 @@ export default function Home() {
           <article><LockKeyhole aria-hidden /><div><h3>Verified sign-in</h3><p>Google and phone OTP use Firebase. Protected API requests require a valid Firebase ID token.</p></div><span>Available now</span></article>
           <article><BadgeCheck aria-hidden /><div><h3>Explicit final review</h3><p>The product, price, address, payment preference, and transaction mode are shown before confirmation.</p></div><span>Available now</span></article>
           <article><ListChecks aria-hidden /><div><h3>Saved household data</h3><p>Lists, contacts, and comfort preferences on these screens are currently saved in this browser.</p></div><span className="local">On this device</span></article>
-          <article><ShoppingBasket aria-hidden /><div><h3>Swiggy provider connection</h3><p>Live access is awaiting approval and credentials. Estimated data is labelled and cannot silently become a real order.</p></div><span className="pending">Requires access</span></article>
+          <article><ShoppingBasket aria-hidden /><div><h3>Swiggy provider connection</h3><p>Builders Club approval is received; Instamart MCP onboarding and credentials are in progress. Estimated data is labelled and cannot silently become a real order.</p></div><span className="pending">Onboarding</span></article>
         </div>
       </section>
 
