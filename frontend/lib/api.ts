@@ -3,13 +3,20 @@ import { signOut as firebaseSignOut } from 'firebase/auth'
 import { auth } from './firebase'
 import { useGANGUStore } from './store'
 
-// Vercel builds do not inherit local .env files. Keep local development pointed at
-// FastAPI, but use the deployed API when no production environment override exists.
+// Vercel builds do not inherit local .env files. Also ignore legacy ngrok values:
+// temporary tunnels expire and must never be compiled into a production release.
 const DEFAULT_API_URL = process.env.NODE_ENV === 'production'
   ? 'https://gangu-api.onrender.com'
   : 'http://localhost:8000'
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/$/, '')
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || API_BASE_URL.replace(/^http/, 'ws').replace(/\/$/, '')
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
+const configuredWsUrl = process.env.NEXT_PUBLIC_WS_URL?.trim()
+const isTemporaryTunnel = (url?: string) => Boolean(url && /\.ngrok(?:-free)?\.(?:app|dev)(?:\/|$)/i.test(url))
+const API_BASE_URL = (!configuredApiUrl || isTemporaryTunnel(configuredApiUrl)
+  ? DEFAULT_API_URL
+  : configuredApiUrl).replace(/\/$/, '')
+const WS_BASE_URL = (!configuredWsUrl || isTemporaryTunnel(configuredWsUrl)
+  ? API_BASE_URL.replace(/^http/, 'ws')
+  : configuredWsUrl).replace(/\/$/, '')
 
 export const requestErrorMessage = (error: unknown): string => {
   if (!axios.isAxiosError(error)) return 'GANGU could not process your request. Please try again.'
